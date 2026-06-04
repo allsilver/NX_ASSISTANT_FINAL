@@ -1,0 +1,45 @@
+{
+  "__meta__": {
+    "available_models": [
+      "gauss:o4-instruct",
+      "gauss:o4-think"
+    ],
+    "router_model": "gauss:o4-instruct"
+  },
+  "MEG_STANDARD": {
+    "display_name": "설계수순서",
+    "description": "기구 설계 표준 체크리스트 검색",
+    "model": "gauss:o4-instruct",
+    "prompt_file": "MEG_STANDARD.txt",
+    "case_prompts": {
+      "1": "MEG_STANDARD_case1.txt",
+      "2": "MEG_STANDARD_case2.txt"
+    },
+    "db_keys": ["MEG_STANDARD"],
+    "default_use_think": false
+  },
+  "MECHA_DFM": {
+    "display_name": "DFM",
+    "description": "공정 설계 표준 검색",
+    "model": "gauss:o4-instruct",
+    "prompt_file": "MECHA_DFM.txt",
+    "db_keys": ["MECHA_DFM"],
+    "default_use_think": false
+  },
+  "CMF_DFC": {
+    "display_name": "DFC",
+    "description": "Design For Cost 가이드라인",
+    "model": "gauss:o4-instruct",
+    "prompt_file": "CMF_DFC.txt",
+    "db_keys": ["CMF_DFC"],
+    "default_use_think": false
+  },
+  "CMF_ISSUE": {
+    "display_name": "CMF",
+    "description": "CMF 문제/이력 검색",
+    "model": "gauss:o4-instruct",
+    "prompt_file": "CMF_ISSUE.txt",
+    "db_keys": ["CMF_ISSUE"],
+    "default_use_think": false
+  }
+}

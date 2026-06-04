@@ -1,0 +1,30 @@
+# 민감 정보
+server/config/settings.json
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# C# 빌드
+client/app/bin/
+client/app/obj/
+client/app/publish/
+client/nx-launcher/bin/
+client/nx-launcher/obj/
+
+# NX 빌드 산출물
+client/nx-customization/startup/*.dll
+client/nx-customization/application/*.dll
+
+# 데이터 (서버 PC에만 존재)
+data/
+models/
+
+# 런타임
+runtime/*
+!runtime/.gitkeep
+logs/*
+!logs/.gitkeep
