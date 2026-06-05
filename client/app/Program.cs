@@ -38,7 +38,8 @@ internal static class Program
             Directory.CreateDirectory(dir);
             File.AppendAllText(
                 Path.Combine(dir, "nx-assistant.log"),
-                DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + message + Environment.NewLine);
+                DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff ") + message + Environment.NewLine,
+                System.Text.Encoding.UTF8);
         }
         catch { }
     }

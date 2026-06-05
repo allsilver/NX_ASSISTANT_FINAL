@@ -33,6 +33,12 @@ public class GaussProvider : ILlmProvider
 
     public Task<bool> PrepareAsync() => Task.FromResult(true);
 
+    // 라우팅/분류용 격리 호출.
+    // Gauss는 서버 경유라 별도 격리가 불필요(매 호출이 독립적).
+    // 지금은 ChatAsync와 동일하게 처리. (추후 서버에 분류 전용 엔드포인트 추가 가능)
+    public Task<string> AskIsolatedAsync(string prompt, CancellationToken ct = default)
+        => ChatAsync(prompt, ct);
+
     /// <summary>
     /// DB MCP 서버에 이미 라우팅/RAG가 완료된 프롬프트를 전달.
     /// prompt는 서버에서 구성된 최종 답변 요청.

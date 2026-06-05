@@ -12,7 +12,8 @@ namespace NxAssistant.UI;
 public sealed class AssistantForm : Form
 {
     // ── 핵심 컴포넌트 ──────────────────────────────────────────────
-    private readonly WorkerForm     _worker;
+    private readonly WorkerForm     _worker;         // 사용자 대화용 워커
+    private readonly WorkerForm     _routerWorker;   // 1차 라우터용 워커 (임시채팅)
     private readonly HistoryManager _history  = new();
     private readonly DbMcpClient    _dbMcp    = new();
     private readonly NxMcpClient    _nxMcp    = new();
@@ -43,7 +44,8 @@ public sealed class AssistantForm : Form
 
     public AssistantForm(WorkerForm worker)
     {
-        _worker = worker;
+        _worker       = worker;
+        _routerWorker = new WorkerForm(WorkerRole.Router);
         Text          = "NX Assistant";
         Icon          = AppIcon.Load();
         StartPosition = FormStartPosition.CenterScreen;
@@ -192,7 +194,7 @@ public sealed class AssistantForm : Form
     private async Task SelectGptAsync()
     {
         _gptReady = false;
-        _provider = new GptProvider(_worker);
+        _provider = new GptProvider(_worker, _routerWorker);
         _router   = new RouterClient(_dbMcp, _nxMcp, _history);
 
         HighlightProviderButton(_gptButton, _gaussButton);
@@ -321,6 +323,7 @@ public sealed class AssistantForm : Form
 
         AddMessage("Assistant", "대화가 초기화되었습니다.");
     }
+
 
     // ── 메시지 렌더링 ──────────────────────────────────────────────
     public void AddMessage(string role, string content)

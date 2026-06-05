@@ -1,6 +1,13 @@
 // router/RouterClient.cs
-// 전체 대화 흐름 조율
-// 1차 라우터 → 2차 intent LLM → MCP 호출 → 답변 LLM
+// 전체 대화 흐름 조율 (팀장 역할)
+//
+// 흐름:
+//   질문 → 1차 라우터(Provider 격리 호출로 분류)
+//        → db_search  : DB MCP 서버 검색 (없으면 안내)
+//        → nx_control : NX MCP 상태 + Provider 답변
+//        → chat       : Provider 답변
+//
+// [우회 모드] NX_ASSISTANT_MODE=vdi 또는 분류 실패 시 → 바로 chat
 
 using NxAssistant.History;
 using NxAssistant.Mcp;
@@ -12,66 +19,118 @@ public record ChatResult(string Answer, string Intent, string Domain);
 
 public class RouterClient
 {
-    private readonly DbMcpClient  _dbMcp;
-    private readonly NxMcpClient  _nxMcp;
+    private readonly DbMcpClient    _dbMcp;
+    private readonly NxMcpClient    _nxMcp;
     private readonly HistoryManager _history;
+
+    private readonly bool _bypassByEnv;
 
     public RouterClient(DbMcpClient dbMcp, NxMcpClient nxMcp, HistoryManager history)
     {
         _dbMcp   = dbMcp;
         _nxMcp   = nxMcp;
         _history = history;
+
+        var mode = Environment.GetEnvironmentVariable("NX_ASSISTANT_MODE") ?? "";
+        _bypassByEnv = mode.Trim().Equals("vdi", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task<ChatResult> HandleAsync(
-        string          userMessage,
-        ILlmProvider    provider,
+        string            userMessage,
+        ILlmProvider      provider,
         CancellationToken ct = default)
     {
-        // ── 1차 라우팅 ────────────────────────────────────────────
-        var routeResult = await _dbMcp.RouteAsync(
-            userMessage,
-            _history.ForRouter(),
-            ct);
+        // ── 우회 모드: 1차 라우터 건너뛰고 바로 답변 ──────────────
+        if (_bypassByEnv)
+        {
+            NxAssistant.Program.Log("[Router] 우회 모드(vdi) → 바로 chat");
+            return await HandleChatAsync(userMessage, provider, ct);
+        }
+        NxAssistant.Program.Log("[Router] 라우터 모드 진입");
 
-        var intent = routeResult.Intent;
+        // ── 1차 라우터: Provider 격리 호출로 분류 ─────────────────
+        string intent;
+        try
+        {
+            intent = await ClassifyAsync(userMessage, provider, ct);
+        }
+        catch (Exception)
+        {
+            // 분류 실패 → 안전하게 chat 처리
+            return await HandleChatAsync(userMessage, provider, ct);
+        }
 
-        // ── intent별 처리 ─────────────────────────────────────────
+        // ── intent별 분기 ─────────────────────────────────────────
         return intent switch
         {
             "db_search"  => await HandleDbSearchAsync(userMessage, provider, ct),
             "nx_control" => await HandleNxControlAsync(userMessage, provider, ct),
-            "chat"       => await HandleChatAsync(userMessage, provider, ct),
             _            => await HandleChatAsync(userMessage, provider, ct),
         };
     }
 
+    // ── 1차 라우터 분류 (격리 호출) ───────────────────────────────
+    private async Task<string> ClassifyAsync(
+        string question, ILlmProvider provider, CancellationToken ct)
+    {
+        var prompt =
+            "너는 질문 분류기다. 아래 질문을 정확히 한 단어로만 분류하라. 다른 말은 절대 하지 마라.\n\n" +
+            "분류 기준:\n" +
+            "- db_search: 설계 표준, 수치, 규격, 가이드, 치수 등 DB 검색이 필요한 질문\n" +
+            "- nx_control: NX CAD 프로그램 조작, 모델링 작업 요청\n" +
+            "- browser: 웹사이트, 포털, PLM 등 브라우저 작업\n" +
+            "- chat: 그 외 인사, 잡담, 일반 대화\n\n" +
+            $"질문: {question}\n\n답(한 단어):";
+
+        var t0 = DateTime.Now;
+        NxAssistant.Program.Log($"[Router] 분류 호출 시작: \"{question}\"");
+
+        var raw = await provider.AskIsolatedAsync(prompt, ct);
+        var elapsed = (DateTime.Now - t0).TotalSeconds;
+        var cleaned = (raw ?? "").Trim().ToLowerInvariant();
+
+        NxAssistant.Program.Log($"[Router] 분류 응답({elapsed:F1}초) raw=\"{raw}\" cleaned=\"{cleaned}\"");
+
+        // 응답에서 카테고리 키워드 추출 (LLM이 문장으로 답해도 잡아냄)
+        string result;
+        if      (cleaned.Contains("db_search"))  result = "db_search";
+        else if (cleaned.Contains("nx_control")) result = "nx_control";
+        else if (cleaned.Contains("browser"))    result = "browser";
+        else                                     result = "chat";
+
+        NxAssistant.Program.Log($"[Router] 최종 분류: {result}");
+        return result;
+    }
+
     // ── DB 검색 흐름 ──────────────────────────────────────────────
     private async Task<ChatResult> HandleDbSearchAsync(
-        string         question,
-        ILlmProvider   provider,
-        CancellationToken ct)
+        string question, ILlmProvider provider, CancellationToken ct)
     {
-        // DB MCP 서버에 라우팅+RAG+답변 한번에 요청
-        // (2차 DB intent LLM은 서버 내부에서 처리)
-        var result = await _dbMcp.AskAsync(
-            question:       question,
-            rewrittenQuery: question,     // 서버에서 재작성
-            domain:         "",           // 서버에서 자동 선택
-            caseNum:        1,            // 서버에서 자동 판단
-            history:        _history.ForAnswer(),
-            ct:             ct);
-
-        return new ChatResult(result.Answer, "db_search", result.Domain);
+        try
+        {
+            var result = await _dbMcp.AskAsync(
+                question:       question,
+                rewrittenQuery: question,
+                domain:         "",
+                caseNum:        1,
+                history:        _history.ForAnswer(),
+                ct:             ct);
+            return new ChatResult(result.Answer, "db_search", result.Domain);
+        }
+        catch (Exception)
+        {
+            // DB 서버 없음 (VDI 등) → 안내 메시지
+            return new ChatResult(
+                "이 질문은 설계 표준 DB 검색이 필요합니다. " +
+                "현재 DB 서버에 연결할 수 없습니다. (개발 중)",
+                "db_search", "");
+        }
     }
 
     // ── NX 제어 흐름 ──────────────────────────────────────────────
     private async Task<ChatResult> HandleNxControlAsync(
-        string         question,
-        ILlmProvider   provider,
-        CancellationToken ct)
+        string question, ILlmProvider provider, CancellationToken ct)
     {
-        // Phase 1: NX 상태만 확인하고 GPT/Gauss에게 넘김
         var nxAvailable = await _nxMcp.IsAvailableAsync(ct);
         var nxStatus    = nxAvailable
             ? await _nxMcp.GetStatusAsync(ct)
@@ -87,9 +146,7 @@ public class RouterClient
 
     // ── 잡담/일반 대화 흐름 ───────────────────────────────────────
     private async Task<ChatResult> HandleChatAsync(
-        string         question,
-        ILlmProvider   provider,
-        CancellationToken ct)
+        string question, ILlmProvider provider, CancellationToken ct)
     {
         var historyText = _history.ForIntent();
         var prompt = string.IsNullOrEmpty(historyText)

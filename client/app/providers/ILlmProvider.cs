@@ -9,8 +9,11 @@ public interface ILlmProvider
     string Name { get; }
     bool   IsReady { get; }
 
-    /// <summary>비스트리밍 응답</summary>
+    /// <summary>비스트리밍 응답 (사용자 대화에 누적)</summary>
     Task<string> ChatAsync(string prompt, CancellationToken ct = default);
+
+    /// <summary>격리된 단발 호출 (라우팅/분류용, 사용자 대화에 안 남김)</summary>
+    Task<string> AskIsolatedAsync(string prompt, CancellationToken ct = default);
 
     /// <summary>스트리밍 응답 (토큰 단위 yield)</summary>
     IAsyncEnumerable<string> StreamAsync(string prompt, CancellationToken ct = default);
