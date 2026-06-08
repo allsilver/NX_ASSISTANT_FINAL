@@ -8,22 +8,15 @@
     <PlatformTarget>x64</PlatformTarget>
     <AssemblyName>NxAssistant</AssemblyName>
     <RootNamespace>NxAssistant</RootNamespace>
-<<<<<<< Updated upstream
-    <ApplicationIcon>..\..\..\..\logo\nx-assistant-logo-official-nx-stars-v3-taskbar-fit.ico</ApplicationIcon>
-    <!-- 자체포함 빌드: dotnet publish -r win-x64 --self-contained -->
-=======
 
-    <!-- 환경변수에서 WebView2 경로 읽기 (PC마다 1회 설정) -->
     <WebView2CoreDll>$(WEBVIEW2_CORE_DLL)</WebView2CoreDll>
     <WebView2WinFormsDll>$(WEBVIEW2_WINFORMS_DLL)</WebView2WinFormsDll>
     <WebView2LoaderDll>$(WEBVIEW2_LOADER_DLL)</WebView2LoaderDll>
->>>>>>> Stashed changes
   </PropertyGroup>
 
-  <!-- 환경변수 미설정 시 빌드 중단하고 친절한 안내 -->
   <Target Name="CheckWebView2Env" BeforeTargets="Build">
     <Error Condition="'$(WebView2CoreDll)' == ''"
-           Text="환경변수 WEBVIEW2_CORE_DLL 이 설정되지 않았습니다. README의 'WebView2 경로 설정'을 참고하세요." />
+           Text="환경변수 WEBVIEW2_CORE_DLL 이 설정되지 않았습니다." />
     <Error Condition="'$(WebView2WinFormsDll)' == ''"
            Text="환경변수 WEBVIEW2_WINFORMS_DLL 이 설정되지 않았습니다." />
     <Error Condition="'$(WebView2LoaderDll)' == ''"
@@ -31,12 +24,6 @@
   </Target>
 
   <ItemGroup>
-<<<<<<< Updated upstream
-    <!-- WebView2: 로컬 설치된 SDK 경로 또는 NuGet 패키지 사용 -->
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.*" />
-  </ItemGroup>
-</Project>
-=======
     <Reference Include="Microsoft.Web.WebView2.Core">
       <HintPath>$(WebView2CoreDll)</HintPath>
     </Reference>
@@ -52,4 +39,3 @@
     </None>
   </ItemGroup>
 </Project>
->>>>>>> Stashed changes

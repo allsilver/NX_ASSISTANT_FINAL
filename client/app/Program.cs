@@ -17,8 +17,7 @@ internal static class Program
         {
             Log("NX Assistant 시작");
             ApplicationConfiguration.Initialize();
-            using var worker = new WorkerForm();
-            Application.Run(new AssistantForm(worker));
+            Application.Run(new MainForm());
             Log("정상 종료");
         }
         catch (Exception ex)
