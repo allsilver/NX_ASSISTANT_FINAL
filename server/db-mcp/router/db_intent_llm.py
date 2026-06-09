@@ -38,7 +38,7 @@ def analyze(question: str, history_text: str, domain_registry: dict, llm) -> dic
 
     Returns:
         {
-            "domain": "MEG_STANDARD",
+            "domain": "MECH_STANDARD",
             "rewritten_query": "재작성된 쿼리",
             "case": 1
         }
@@ -56,7 +56,7 @@ def analyze(question: str, history_text: str, domain_registry: dict, llm) -> dic
     # 기본 도메인 (첫 번째 도메인)
     default_domain = next(
         (k for k in domain_registry if not k.startswith("__")),
-        "MEG_STANDARD"
+        "MECH_STANDARD"
     )
 
     prompt_template = _load_prompt()

@@ -50,7 +50,7 @@ public class DbMcpClient
         CancellationToken ct = default)
     {
         var payload = new { question, history = historyText };
-        var result  = await PostAsync<JsonElement>("/meg/route", payload, ct);
+        var result  = await PostAsync<JsonElement>("/mech/route", payload, ct);
         var intent  = result.TryGetProperty("intent", out var v) ? v.GetString() ?? "chat" : "chat";
         return new RouteResult(intent);
     }
@@ -75,7 +75,7 @@ public class DbMcpClient
             synonym_hint = synonymHint,
         };
 
-        var result = await PostAsync<JsonElement>("/meg/ask", payload, ct);
+        var result = await PostAsync<JsonElement>("/mech/ask", payload, ct);
 
         return new DbMcpResult(
             Question:       GetStr(result, "question"),

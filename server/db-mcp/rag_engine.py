@@ -25,7 +25,7 @@ MAX_DOCS_PER_SECTION = 15
 SECTION_SCORE_THRESHOLD = 0.3
 
 _SRC_DIR      = Path(__file__).parent
-_PROJECT_ROOT = _SRC_DIR.parent.parent  # NX_Assistant/
+_PROJECT_ROOT = _SRC_DIR.parent  # server/
 
 RERANKER_MODEL_PATH = _PROJECT_ROOT / "models" / "bge-reranker-v2-m3"
 _reranker = None
@@ -262,7 +262,7 @@ def setup_design_bot(
     no_think_prefix = "" if use_think else "/no_think\n"
 
     # 기본 답변 체인
-    answer_prompt_file = domain_config.get("prompt_file", "MEG_STANDARD.txt")
+    answer_prompt_file = domain_config.get("prompt_file", "MECH_STANDARD.txt")
     _answer_template   = no_think_prefix + _load_prompt_template(answer_prompt_file)
     answer_chain       = ChatPromptTemplate.from_template(_answer_template) | llm | StrOutputParser()
 

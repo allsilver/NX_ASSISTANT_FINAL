@@ -1,0 +1,29 @@
+{
+  "_comment": "이 파일을 settings.json 으로 복사한 뒤 실제 값을 채우세요. settings.json 은 .gitignore 대상입니다.",
+
+  "db_mcp_token": "change-me-to-a-long-random-token",
+  "router_model": "gauss:o4-instruct",
+
+  "experiment": {
+    "fixed": {
+      "reranker":  true,
+      "guide_raw": true,
+      "num_ctx":   4096
+    },
+    "gauss": {
+      "_comment": "MEG_ChatBot_claude 의 src/experiment_config.json 의 gauss 섹션 값을 그대로 가져오면 됩니다.",
+      "access_key": "YOUR_GAUSS_ACCESS_KEY",
+      "secret_key": "YOUR_GAUSS_SECRET_KEY",
+      "models": {
+        "o4-instruct": {
+          "api_url":    "https://.../gauss-o4-instruct/v1/chat/completions",
+          "model_name": "GaussO4_Instruct_..."
+        },
+        "o4-think": {
+          "api_url":    "https://.../gauss-o4-think/v1/chat/completions",
+          "model_name": "GaussO4_Think_..."
+        }
+      }
+    }
+  }
+}

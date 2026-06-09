@@ -1,6 +1,6 @@
 // providers/GaussProvider.cs
 // Gauss API REST 호출 프로바이더
-// DB MCP 서버의 /meg/ask를 통해 RAG+LLM 결과를 받아옴
+// DB MCP 서버의 /mech/ask를 통해 RAG+LLM 결과를 받아옴
 
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -14,6 +14,9 @@ public class GaussProvider : ILlmProvider
 {
     public string Name    => "Gauss";
     public bool   IsReady => true;   // REST API는 항상 준비됨
+
+    /// <summary>현재 DB 도메인 키. /mech/ask 요청에 실림. (LlmSession.SetDomain 으로 설정)</summary>
+    public string Domain  { get; set; } = "";
 
     private readonly HttpClient _http;
     private readonly string     _dbMcpUrl;
@@ -40,17 +43,21 @@ public class GaussProvider : ILlmProvider
         => ChatAsync(prompt, ct);
 
     /// <summary>
-    /// DB MCP 서버에 이미 라우팅/RAG가 완료된 프롬프트를 전달.
-    /// prompt는 서버에서 구성된 최종 답변 요청.
+    /// DB MCP 서버 /mech/ask 호출 (RAG 검색 + Gauss 답변 완성).
+    /// 검색 범위는 현재 Domain. (db_keys 미지정 → 서버가 도메인 전체 검색)
     /// </summary>
     public async Task<string> ChatAsync(string prompt, CancellationToken ct = default)
     {
-        // 직접 Gauss API 호출 (DB MCP를 거치지 않고 순수 LLM 호출)
-        // 용도: NX 제어, 브라우저 자동화, 잡담 등 DB 검색이 필요 없는 경우
-        var payload = new { prompt };
-        var body    = JsonSerializer.Serialize(payload);
+        var payload = new
+        {
+            question = prompt,
+            domain   = Domain,
+            @case    = 1,
+            history  = Array.Empty<object>(),
+        };
+        var body = JsonSerializer.Serialize(payload);
         using var req = new HttpRequestMessage(HttpMethod.Post,
-            new Uri(new Uri(_dbMcpUrl), "/gauss/chat"))
+            new Uri(new Uri(_dbMcpUrl), "/mech/ask"))
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json")
         };
@@ -59,7 +66,7 @@ public class GaussProvider : ILlmProvider
         var text = await resp.Content.ReadAsStringAsync(ct);
 
         if (!resp.IsSuccessStatusCode)
-            throw new InvalidOperationException($"Gauss API 오류 {(int)resp.StatusCode}: {text[..Math.Min(200, text.Length)]}");
+            throw new InvalidOperationException($"DB MCP 오류 {(int)resp.StatusCode}: {text[..Math.Min(300, text.Length)]}");
 
         using var doc = JsonDocument.Parse(text);
         return doc.RootElement.TryGetProperty("answer", out var answer)

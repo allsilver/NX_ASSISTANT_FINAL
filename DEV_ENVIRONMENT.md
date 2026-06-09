@@ -14,9 +14,12 @@
 - 설치됨: .NET 8 (dotnet 8.0.421), Python 3.14.4, git 2.53, WebView2 Runtime
 
 ### 로컬 PC (서버 실행/테스트 환경)
-- 용도: DB MCP 서버 실행, RAG 테스트, 통합 테스트, 파인튜닝
+- 용도: DB MCP 서버 실행, RAG 테스트, **WinForm 빌드·실행, 통합 테스트**, 파인튜닝
 - pip / Gauss API / 모델 다운로드 다 됨
 - meg_chatbot 작업 때 data/, models/ 폴더 이미 구축돼 있음
+- **.NET 8 + NuGet 사용 가능** (인터넷 됨) → WinForm 빌드 가능. VDI보다 사양·환경이 좋음
+- **WebView2: NuGet 패키지로 복원** (VDI 처럼 로컬 dll 환경변수 불필요)
+- 결론: 서버와 클라(WinForm)를 한 PC에서 다 띄울 수 있어, **client↔server 통합 테스트는 로컬 PC에서 진행**
 
 ---
 
@@ -71,16 +74,28 @@ Get-Process dotnet -ErrorAction SilentlyContinue | Stop-Process -Force
 
 ---
 
-## 5. WebView2 (NuGet 우회)
+## 5. WebView2 (환경별 자동 분기)
 
-VDI에서 NuGet이 막혀서, WebView2를 로컬 설치된 dll로 참조.
-csproj가 아래 환경변수로 dll 경로를 읽음:
+csproj(`NxAssistant.csproj`)가 `WEBVIEW2_CORE_DLL` 경로에 dll 이 **실제로 존재하는지**(`Exists`)로 자동 분기한다:
+- **dll 파일 있음 = VDI**: NuGet 막혀서 로컬 설치 dll 을 참조 (아래 환경변수 사용)
+- **dll 파일 없음 = 로컬 PC**: NuGet 패키지(`Microsoft.Web.WebView2`)로 복원
+  (환경변수가 비었거나, 환경변수만 있고 그 경로에 파일이 없어도 자동으로 NuGet)
+
+VDI 용 환경변수 (User 영구):
 
 | 환경변수 | 값 (예시) |
 |---|---|
 | WEBVIEW2_CORE_DLL | ...\NX_Assistant_codex\...\Microsoft.Web.WebView2.Core.dll |
 | WEBVIEW2_WINFORMS_DLL | ...\Microsoft.Web.WebView2.WinForms.dll |
 | WEBVIEW2_LOADER_DLL | C:\Program Files\Microsoft Office\root\Office16\WebView2Loader.dll |
+
+로컬 PC 빌드(환경변수 불필요):
+```powershell
+cd client\app
+dotnet restore   # WebView2 NuGet 복원
+dotnet build
+.\bin\Debug\net8.0-windows\NxAssistant.exe
+```
 
 ---
 
@@ -128,3 +143,27 @@ csproj가 아래 환경변수로 dll 경로를 읽음:
 | allsilver/NX_ASSISTANT_FINAL | 현재 작업 레포 |
 | allsilver/MEG_ChatBot_claude | RAG 챗봇 원본 (Django UI, 검증된 RAG 로직) |
 | allsilver/NX_Assistant_codex | 기존 WebView2 구현 (WebView2 dll 출처) |
+
+---
+
+## 11. 로컬 전용 데이터 — VDI→로컬 동기화 시 보존 (덮어쓰기 금지)
+
+VDI 는 코드만 git 으로 관리한다. 아래는 **로컬 PC 에만 존재·수정**되며 git/ZIP 에 없다.
+VDI→로컬 통째 덮어쓰기 시 이 항목들이 사라지지 않도록 반드시 보존할 것.
+(설정값을 로컬에서 고쳐도 VDI 가 모르므로, 같은 수정을 VDI 코드/문서에도 반영해야 다음 ZIP 에 반영됨)
+
+| 경로 | 내용 | 분실 시 |
+|---|---|---|
+| `server/config/settings.json` | 실제 Gauss 키 + db_mcp_token | example 에서 복사 후 키 재입력 (번거로움) |
+| `server/data/` | ChromaDB, db_registry_*.json, parsed_result | 재구축 또는 meg_chatbot 에서 재배치 |
+| `server/models/` | bge-reranker-v2-m3 | 재다운로드 (느림) |
+| `server/.venv/` | Python 가상환경 | 재생성 가능 (pip install 다시) |
+| `client/app/bin/`, `obj/` | 빌드 산출물 | 재빌드 |
+
+**권장 동기화 방식:**
+- (X) 기존 NX_ASSISTANT_FINAL 폴더를 통째 삭제 후 ZIP 압축해제 → 위 항목 전부 소실
+- (O) 코드 파일만 덮어쓰기(merge) → ZIP 에 없는 위 항목은 그대로 보존
+- 또는 ZIP 풀기 전 위 폴더들을 백업 → 푼 뒤 복원
+
+**주의:** `settings.json`, `db_registry_*.json` 의 default 플래그처럼 로컬에서만 고친 값은,
+같은 내용을 VDI 의 코드/문서(또는 settings.example.json)에도 반영해두지 않으면 다음 동기화 때 놓치기 쉽다.

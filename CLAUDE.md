@@ -75,28 +75,43 @@ NX_ASSISTANT_FINAL/
 │   │   ├── GptProvider.cs           ← GPT (WorkerForm 래핑, userWorker만)
 │   │   └── LlmSession.cs            ← 앱 전역 LLM 선택 관리
 │   ├── mcp/
-│   │   ├── DbMcpClient.cs           ← DB 서버 HTTP 요청 (/meg/ask 등)
+│   │   ├── DbMcpClient.cs           ← DB 서버 HTTP 요청 (/mech/ask 등)
 │   │   └── NxMcpClient.cs           ← NX MCP 호출
 │   ├── history/HistoryManager.cs    ← 대화 히스토리
 │   ├── router/RouterClient.cs       ← (1차 배포 미사용, 2차 라우터용 보존)
 │   ├── Program.cs                   ← MainForm 실행
 │   └── NxAssistant.csproj
 │
-├── server/db-mcp/                  ← 서버 PC 전용 (RAG)
-│   ├── server.py                    ← HTTP 서버 (/health, /meg/domains, /meg/route, /meg/ask)
-│   ├── rag_engine.py                ← RAG 파이프라인
-│   ├── vector_store.py              ← ChromaDB 구축/로드
-│   ├── domain_registry.json         ← 도메인 목록
-│   ├── llm/gauss_llm.py             ← GaussLLM (LangChain)
-│   ├── router/                      ← 라우터 LLM (2차용)
-│   ├── retrievers/vector_retriever.py
-│   └── prompts/                     ← 도메인별 답변 프롬프트
+├── server/                         ← 서버 PC 전용 (RAG). 이 폴더만 서버 PC로 복사
+│   ├── db-mcp/
+│   │   ├── server.py                ← HTTP 서버 (/health, /mech/domains, /mech/dbkeys, /mech/route, /mech/ask)
+│   │   ├── rag_engine.py            ← RAG 파이프라인 (models = server/models)
+│   │   ├── vector_store.py          ← ChromaDB 로드 (data = server/data)
+│   │   ├── domain_registry.json     ← 도메인 목록 (MECH_STANDARD 등)
+│   │   ├── llm/gauss_llm.py         ← GaussLLM (LangChain)
+│   │   ├── router/                  ← 라우터 LLM (2차용)
+│   │   ├── retrievers/vector_retriever.py
+│   │   └── prompts/                 ← 도메인별 답변 프롬프트 (MECH_STANDARD*.txt 등)
+│   ├── config/
+│   │   ├── settings.example.json    ← 템플릿
+│   │   └── settings.json            ← 실제 키 (직접 생성, gitignore)
+│   ├── scripts/
+│   │   ├── start_db_server.ps1      ← 서버 실행
+│   │   ├── smoke_test.py            ← 단독 점검 (health→domains→ask)
+│   │   └── check_retrieval.py       ← 벡터 검색만 점검 (LLM 없이, 도메인별)
+│   ├── data/                        ← 직접 배치 (gitignore)
+│   ├── models/                      ← 직접 배치 (gitignore)
+│   ├── requirements.txt
+│   └── README_SERVER.md             ← 서버 실행/테스트 가이드
 │
+├── client/
+│   └── README_CLIENT.md             ← 클라 빌드/실행 가이드
 ├── CLAUDE.md                        ← (이 파일) 프로젝트 설명서
+├── DEV_ENVIRONMENT.md               ← 개발 환경 정리
 └── PROGRESS.md                      ← 진행상황 + 할 일
 ```
 
-※ data/, models/ 폴더는 무거워서 깃헙 미포함. 로컬/서버 PC에만 존재.
+※ data/, models/ 는 무거워서 깃헙 미포함. **`server/` 바로 아래**에 배치 (코드가 이 위치 기준).
 ※ src/ 폴더(구버전 키워드매칭)는 사용 안 함.
 
 ---
@@ -110,8 +125,11 @@ NX_ASSISTANT_FINAL/
 | CMF_ISSUE | CMF | CMF 문제/이력 |
 | MECHA_DFM | DFM | 공정 설계 표준 (제조 고려) |
 
-※ 현재 서버 코드엔 일부가 옛 이름(MEG_STANDARD)으로 되어 있어 MECH로 변경 예정.
-  (클라이언트 MainForm은 이미 MECH_STANDARD 사용)
+※ 서버·클라 모두 MECH_STANDARD 로 통일 완료 (엔드포인트도 /mech/...).
+※ 도메인 하위 DB 선택: `data/{도메인}/db_registry_{도메인}.json` 을 서버가 자동 인식.
+  사용자가 카드에서 복수 선택 → ask 의 db_keys 로 검색 범위 지정. (없으면 전체)
+  MECH_STANDARD db_key: mobile/foldable/water_proof/wearable,
+  MECHA_DFM: cam_design/jig_design/metal_design/mold_design, CMF_*: 단일.
 
 ---
 

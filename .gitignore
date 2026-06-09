@@ -19,9 +19,9 @@ client/nx-launcher/obj/
 client/nx-customization/startup/*.dll
 client/nx-customization/application/*.dll
 
-# 데이터 (서버 PC에만 존재)
-data/
-models/
+# 데이터 (서버 PC에만 존재, server/ 아래)
+server/data/
+server/models/
 
 # 런타임
 runtime/*

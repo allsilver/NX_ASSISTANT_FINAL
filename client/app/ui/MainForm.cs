@@ -81,6 +81,7 @@ public sealed class MainForm : Form
     // ── 화면 3: 채팅 ─────────────────────────────────────────
     private void ShowChat()
     {
+        _session.SetDomain(_domain);   // Gauss DB조회 시 /mech/ask 에 도메인 전달
         var view = new ChatView(_domainName, _session,
             onBack: ShowDomainSelect,
             onHome: ShowFieldSelect);

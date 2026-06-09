@@ -20,7 +20,7 @@ EMBEDDING_MODEL = "qwen3-embedding:4b"
 EMBED_BATCH_SIZE = 100
 
 ROOT       = Path(__file__).parent
-DATA_ROOT  = ROOT.parent.parent / "data"   # NX_Assistant/data/
+DATA_ROOT  = ROOT.parent / "data"   # server/data/
 
 
 def _get_persist_dir(domain_key: str, db_key: str, model: str = None) -> Path:

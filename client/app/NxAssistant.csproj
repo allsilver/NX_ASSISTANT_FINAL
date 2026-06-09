@@ -12,9 +12,14 @@
     <WebView2CoreDll>$(WEBVIEW2_CORE_DLL)</WebView2CoreDll>
     <WebView2WinFormsDll>$(WEBVIEW2_WINFORMS_DLL)</WebView2WinFormsDll>
     <WebView2LoaderDll>$(WEBVIEW2_LOADER_DLL)</WebView2LoaderDll>
+
+    <!-- WEBVIEW2_CORE_DLL 경로에 dll 이 실제로 있으면 VDI(로컬 dll 참조),
+         없으면(환경변수가 비었거나 그 경로에 파일이 없으면) 로컬 PC NuGet 복원. -->
+    <UseWebView2Nuget Condition="!Exists('$(WEBVIEW2_CORE_DLL)')">true</UseWebView2Nuget>
   </PropertyGroup>
 
-  <Target Name="CheckWebView2Env" BeforeTargets="Build">
+  <!-- VDI 전용: 환경변수 누락 시 빌드 에러. NuGet 모드면 검사 스킵 -->
+  <Target Name="CheckWebView2Env" BeforeTargets="Build" Condition="'$(UseWebView2Nuget)' != 'true'">
     <Error Condition="'$(WebView2CoreDll)' == ''"
            Text="환경변수 WEBVIEW2_CORE_DLL 이 설정되지 않았습니다." />
     <Error Condition="'$(WebView2WinFormsDll)' == ''"
@@ -23,19 +28,22 @@
            Text="환경변수 WEBVIEW2_LOADER_DLL 이 설정되지 않았습니다." />
   </Target>
 
-  <ItemGroup>
+  <!-- VDI: 로컬 dll 직접 참조 -->
+  <ItemGroup Condition="'$(UseWebView2Nuget)' != 'true'">
     <Reference Include="Microsoft.Web.WebView2.Core">
       <HintPath>$(WebView2CoreDll)</HintPath>
     </Reference>
     <Reference Include="Microsoft.Web.WebView2.WinForms">
       <HintPath>$(WebView2WinFormsDll)</HintPath>
     </Reference>
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include="$(WebView2LoaderDll)">
       <Link>WebView2Loader.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <!-- 로컬 PC: NuGet 패키지 (Core/WinForms/Loader 모두 포함) -->
+  <ItemGroup Condition="'$(UseWebView2Nuget)' == 'true'">
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2592.51" />
   </ItemGroup>
 </Project>

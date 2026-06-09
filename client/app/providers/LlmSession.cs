@@ -94,6 +94,13 @@ public sealed class LlmSession : IDisposable
     public Task<string> AskAsync(string prompt, CancellationToken ct = default)
         => Provider.ChatAsync(prompt, ct);
 
+    /// <summary>DB 도메인 키 설정. Gauss DB조회 시 /mech/ask 에 실린다.</summary>
+    public void SetDomain(string domain)
+    {
+        _gaussProvider ??= new GaussProvider();
+        _gaussProvider.Domain = domain ?? "";
+    }
+
     public void Dispose()
     {
         _gptWorker?.Dispose();

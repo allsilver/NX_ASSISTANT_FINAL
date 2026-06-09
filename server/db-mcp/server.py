@@ -2,9 +2,10 @@
 # DB MCP HTTP 서버
 # 엔드포인트:
 #   GET  /health          — 서버 상태 확인
-#   GET  /meg/domains     — 등록된 도메인 목록
-#   POST /meg/ask         — RAG 검색 + 답변 생성
-#   POST /meg/route       — 1차 라우팅만 (intent 분류)
+#   GET  /mech/domains     — 등록된 도메인 목록
+#   GET  /mech/dbkeys      — 도메인별 선택 가능한 db_key 목록 (카드용)
+#   POST /mech/ask         — RAG 검색 + 답변 생성 (db_keys 로 범위 지정)
+#   POST /mech/route       — 1차 라우팅만 (intent 분류)
 
 from __future__ import annotations
 
@@ -15,10 +16,11 @@ import logging
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 # 경로 설정
 ROOT = Path(__file__).parent
+DATA_ROOT = ROOT.parent / "data"   # server/data/  (vector_store 와 동일 규칙)
 sys.path.insert(0, str(ROOT))
 
 HOST  = os.getenv("DB_MCP_HOST", "127.0.0.1")
@@ -26,7 +28,7 @@ PORT  = int(os.getenv("DB_MCP_PORT", "8766"))
 TOKEN = os.getenv("DB_MCP_TOKEN", "dev-only-token-change-me")
 
 # 설정 파일 로드
-_SETTINGS_PATH = ROOT.parent.parent / "server" / "config" / "settings.json"
+_SETTINGS_PATH = ROOT.parent / "config" / "settings.json"
 _settings: dict = {}
 if _SETTINGS_PATH.exists():
     with open(_SETTINGS_PATH, encoding="utf-8") as f:
@@ -48,12 +50,40 @@ logger = logging.getLogger(__name__)
 
 # ── 봇 캐시 (도메인별 RAG 봇 인스턴스) ─────────────────────────
 _bot_cache: dict = {}
-_vector_db_cache: dict = {}
 
 
-def _get_or_load_bot(domain_key: str):
-    if domain_key in _bot_cache:
-        return _bot_cache[domain_key]
+def _resolve_db_options(domain_key: str) -> dict:
+    """도메인의 선택 가능한 db_key 목록.
+    우선순위: data/{domain}/db_registry_{domain}.json
+              → domain_registry 의 db_keys → 도메인명 단일.
+    반환: {db_key: {display_name, description, default}}
+    """
+    reg_path = DATA_ROOT / domain_key / f"db_registry_{domain_key}.json"
+    if reg_path.exists():
+        try:
+            with open(reg_path, encoding="utf-8") as f:
+                raw = json.load(f)
+            return {
+                k: {
+                    "display_name": v.get("display_name", k),
+                    "description":  v.get("description", ""),
+                    "default":      bool(v.get("default", False)),
+                }
+                for k, v in raw.items()
+            }
+        except Exception as e:
+            logger.error(f"db_registry 읽기 실패 [{domain_key}]: {e}")
+
+    # fallback: domain_registry 의 db_keys 또는 도메인명 단일
+    dc   = _domain_registry.get(domain_key, {})
+    keys = dc.get("db_keys", [domain_key])
+    return {k: {"display_name": k, "description": "", "default": False} for k in keys}
+
+
+def _get_or_load_bot(domain_key: str, db_keys: list):
+    cache_key = f"{domain_key}:{','.join(sorted(db_keys))}"
+    if cache_key in _bot_cache:
+        return _bot_cache[cache_key]
 
     domain_config = _domain_registry.get(domain_key)
     if not domain_config:
@@ -63,11 +93,9 @@ def _get_or_load_bot(domain_key: str):
     from rag_engine import setup_design_bot
     from retrievers.vector_retriever import VectorRetriever
 
-    # DB 목록 (domain_registry에서 db_keys 또는 domain_key 단일)
-    db_keys    = domain_config.get("db_keys", [domain_key])
     vector_dbs = load_multiple_vector_dbs(domain_key, db_keys)
 
-    retriever = VectorRetriever(vector_dbs).search
+    retriever  = VectorRetriever(vector_dbs).search
     exp_config = _settings.get("experiment", {})
 
     bot = setup_design_bot(
@@ -76,8 +104,8 @@ def _get_or_load_bot(domain_key: str):
         vector_dbs    = vector_dbs,
         exp_config    = exp_config,
     )
-    _bot_cache[domain_key] = bot
-    logger.info(f"봇 로드 완료: {domain_key}")
+    _bot_cache[cache_key] = bot
+    logger.info(f"봇 로드 완료: {cache_key}")
     return bot
 
 
@@ -130,7 +158,7 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
 
-        if parsed.path == "/meg/domains":
+        if parsed.path == "/mech/domains":
             if not self._auth():
                 self._send_error(HTTPStatus.UNAUTHORIZED, "unauthorized")
                 return
@@ -144,6 +172,28 @@ class Handler(BaseHTTPRequestHandler):
                 if not k.startswith("__")
             ]
             self._send_json(HTTPStatus.OK, {"domains": domains})
+            return
+
+        if parsed.path == "/mech/dbkeys":
+            if not self._auth():
+                self._send_error(HTTPStatus.UNAUTHORIZED, "unauthorized")
+                return
+            qs     = parse_qs(parsed.query)
+            domain = (qs.get("domain", [""])[0]).strip()
+            if not domain or domain not in _domain_registry:
+                self._send_error(HTTPStatus.BAD_REQUEST, "valid domain required")
+                return
+            options = _resolve_db_options(domain)
+            items = [
+                {
+                    "key":          k,
+                    "display_name": v["display_name"],
+                    "description":  v["description"],
+                    "default":      v["default"],
+                }
+                for k, v in options.items()
+            ]
+            self._send_json(HTTPStatus.OK, {"domain": domain, "db_options": items})
             return
 
         self._send_error(HTTPStatus.NOT_FOUND, "not found")
@@ -160,8 +210,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_error(HTTPStatus.BAD_REQUEST, "invalid body")
             return
 
-        # ── /meg/route — 1차 라우팅만 ───────────────────────────
-        if parsed.path == "/meg/route":
+        # ── /mech/route — 1차 라우팅만 ───────────────────────────
+        if parsed.path == "/mech/route":
             question     = str(payload.get("question", "")).strip()
             history_text = str(payload.get("history", ""))
             if not question:
@@ -177,8 +227,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(e))
             return
 
-        # ── /meg/ask — 전체 RAG 파이프라인 ──────────────────────
-        if parsed.path == "/meg/ask":
+        # ── /mech/ask — 전체 RAG 파이프라인 ──────────────────────
+        if parsed.path == "/mech/ask":
             question     = str(payload.get("question", "")).strip()
             domain_key   = str(payload.get("domain", "")).strip()
             rewritten_q  = str(payload.get("rewritten_query", question)).strip() or question
@@ -200,8 +250,19 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_error(HTTPStatus.BAD_REQUEST, "domain not found")
                 return
 
+            # db_keys 결정: 요청값 ∩ 허용목록, 없으면 전체
+            options     = _resolve_db_options(domain_key)
+            allowed     = list(options.keys())
+            req_db_keys = payload.get("db_keys")
+            if isinstance(req_db_keys, list) and req_db_keys:
+                db_keys = [k for k in req_db_keys if k in allowed]
+                if not db_keys:
+                    db_keys = allowed   # 유효한 선택이 없으면 전체로 fallback
+            else:
+                db_keys = allowed
+
             try:
-                bot    = _get_or_load_bot(domain_key)
+                bot    = _get_or_load_bot(domain_key, db_keys)
                 answer = bot(
                     rewritten_q,
                     chat_history = history,
@@ -212,6 +273,7 @@ class Handler(BaseHTTPRequestHandler):
                     "question":        question,
                     "rewritten_query": rewritten_q,
                     "domain":          domain_key,
+                    "db_keys":         db_keys,
                     "case":            case,
                     "answer":          answer,
                 })
