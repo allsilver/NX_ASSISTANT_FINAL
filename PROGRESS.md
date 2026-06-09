@@ -1,74 +1,80 @@
 # NX Assistant 개발 진행상황
 
-> 최종 업데이트: 2026-06-05
-> 이 파일은 개발 컨텍스트 유지용입니다.
+> 최종 업데이트: 2026-06-08
+> 진행 상황과 다음 할 일만 기록합니다. 프로젝트 구조·환경·규칙은 CLAUDE.md 참조.
 
-## 프로젝트 개요
-Siemens NX 안에서 동작하는 AI 어시스턴트 (WinForms + WebView2).
-- LLM 2종: GPT(WebView2, 개인계정) / Gauss(서버 경유 REST)
-- DB MCP 서버(중앙 PC)로 RAG 기반 설계표준 검색
+---
 
-## 환경 제약 (중요)
-| 항목 | VDI | 로컬 PC |
-|---|---|---|
-| GPT (chatgpt.com) | ✅ 열림 | 다음주부터 |
-| Gauss API (sr-cloud) | ❌ 막힘 | ✅ 사용가능 |
-| pip / PyPI | ❌ 막힘 | ✅ |
-| NuGet | ❌ 막힘 | ✅ |
-| github push/pull | 불안정 | - |
-| dotnet build | ✅ (메모리 제한 옵션 필수) | ✅ |
-| RAM | 8GB (가용 2.4GB) | - |
+## ✅ 완료된 작업
 
-## 빌드 명령 (VDI 필수 옵션)
-```
-cd client/app
-dotnet build -p:UseSharedCompilation=false -m:1 --disable-build-servers
-.\bin\Debug\net8.0-windows\NxAssistant.exe
-```
+### 1차 배포 UI 통합 (최근 - 커밋 9f30fb4)
 
-## 환경변수 (VDI, User 영구)
-- NX_ASSISTANT_MODE = vdi  (우회 모드: 라우터 건너뛰고 GPT 직행)
-- WEBVIEW2_CORE_DLL = ...\NX_Assistant_codex\...\Microsoft.Web.WebView2.Core.dll
-- WEBVIEW2_WINFORMS_DLL = ...\Microsoft.Web.WebView2.WinForms.dll
-- WEBVIEW2_LOADER_DLL = C:\Program Files\Microsoft Office\root\Office16\WebView2Loader.dll
+- **신규 UI 4화면 완성** (단독 테스트 → 본 프로젝트 통합):
+  - 화면0 AI 선택: Gauss/GPT 가로형 큰 카드 2개 ("환영합니다!" + 체크리스트 설명)
+  - 화면1 분야 선택: DB조회 / NX제어 / 자동화
+  - 화면2 DB 도메인: 설계수순서 / DFC / CMF / DFM
+  - 화면3 채팅: AI=배경 텍스트(말풍선X), 나=오른쪽 남색 말풍선,
+    상단바 2줄(뒤로/홈/설정 + 대화초기화/동의어/LLM드롭다운), 입력창 여러줄
+- **파일 구성** (빠른 1차배포 위해 2파일로 묶음, 추후 분리 예정):
+  - `client/app/ui/UiKit.cs` — 공통 컴포넌트 전부
+  - `client/app/ui/MainForm.cs` — 화면 전환 + 4개 View
+  - 기존 `AssistantForm.cs` 삭제, `Program.cs`는 MainForm 실행하도록 수정
+- **GPT 실제 연결**:
+  - `LlmSession.cs` (신규) — 앱 전역 LLM 선택 관리
+  - `GptProvider.cs` — userWorker만 사용 (라우터 1차배포 미사용)
+  - GPT 로그인 자동 처리: 이미 로그인됨 → 창 안 띄움 / 필요 시 → 띄우고 완료 감지 후 자동 숨김
+  - 채팅에서 선택된 LLM으로 실제 답변 호출
+- **검증 완료**: 4화면 전환, GPT 로그인 자동처리, GPT 답변, LLM 토글, 뒤로/홈
+- **커밋 9f30fb4** "feat: 신규 UI 통합 (4화면 + LLM 세션), AssistantForm 대체"
+  (push는 GitHub Desktop으로)
 
-## 완료된 작업
-1. ✅ 프로젝트 폴더 구조 재정립 (server/ client/ 분리)
-2. ✅ VDI 개발환경 구축 (.NET 8, git PATH, 메모리제한 빌드)
-3. ✅ WebView2 로컬 dll 참조 (NuGet 우회) + Loader.dll 자동복사
-4. ✅ csproj 경로를 환경변수로 분리 (VDI/로컬 호환)
-5. ✅ GPT WinForm 채팅 동작 (로그인 감지 #prompt-textarea)
-6. ✅ 라우터 우회 모드 (NX_ASSISTANT_MODE=vdi)
-7. ✅ 워커 2개 구조 (User=일반채팅 / Router=임시채팅 격리)
-8. ✅ 1차 라우터 분류 검증 (db_search / chat 정확히 분류됨)
-9. ✅ throttling 해결 (화면밖 워커도 GPT 응답 읽기 - 검증중)
+### 이전 완료 (UI 통합 전)
 
-## 핵심 발견사항
-- **throttling 문제**: WebView2를 화면 밖(ParkOffscreen)에 두면 렌더링이
-  멈춰서 GPT 응답을 못 읽음. AdditionalBrowserArguments에
-  --disable-background-timer-throttling 등 3개 플래그로 해결.
-- **임시채팅 URL**: https://chatgpt.com/?temporary-chat=true 로 navigate하면
-  격리된 단발 호출 가능. 로그인 세션은 일반채팅과 공유됨.
-- **LLM 호출 속도**: 분류 1회에 9~11초. 라우터+답변 시 20초+ 가능.
-  → 1차 배포에서 라우터 빼는 이유 중 하나.
+- VDI 개발환경 (.NET 8, 메모리제한 빌드), WebView2 로컬 dll 참조(NuGet 우회), csproj 환경변수화
+- GPT WinForm 채팅 동작 (로그인 감지)
+- throttling 해결: WorkerForm에 `--disable-background-timer-throttling` 등 3개 플래그
+  → 화면 밖 워커도 GPT 응답 정상 읽음 (검증 완료)
+- 단독 UI 테스트 4개 → 본 프로젝트 통합 완료
 
-## 다음 작업 (TODO)
-1. [진행예정] 라우터 제거 + 사용자 모드 선택 UI
-   - 모드: DB조회 / NX제어 / 브라우저자동화 / 일반채팅
-   - UI 대폭 수정 (기존 MEG_ChatBot UI 최대한 가져오기) - 별도 논의
-2. [대기] UI 전면 개편 (스크롤/레이아웃 문제 해결)
-3. [대기] pip 문제 해결 → DB MCP 서버 + RAG
-4. [대기] MEG → MECH 네이밍 일괄 변경
-5. [대기] github commit/push (망 열릴 때)
+---
 
-## 2차 배포 개선사항
-- 1차 라우터 추가 (현재 RouterClient에 로직 보존, 호출만 안 함)
-- DB 내부 라우터 (도메인 판단 LLM - GPT or DB서버 종속, 추후 논의)
-- Rolling Summary 히스토리
-- Hybrid Retriever (vector + BM25)
-- Gauss rate limit 대응 (분당 10~50회) - 캐싱, GPT 분산
-- DB MCP 서버 멀티워커 (gunicorn)
+## 📋 다음 작업 (DB MCP 연결 — 1차배포 나머지)
 
-## 알려진 이슈
-- UI 자동 스크롤 안 됨 + 메시지 잘림 (FlowLayoutPanel 레이아웃 계산 문제)
-  → UI 전면 개편 시 해결 예정
+> 주의: DB MCP 내부 동작은 로컬에서 직접 띄워봐야 정확히 파악 가능.
+> 코드만 보고 추측하지 말고, 로컬 테스트로 실제 동작 확인 후 진행할 것.
+
+### 즉시
+1. [ ] 프로젝트 폴더 구조 전체 확인 (`Get-ChildItem -Recurse -Directory`)
+2. [ ] src/ 폴더 정리 (구버전 키워드매칭 → 제거 또는 _archive/ 이동)
+3. [ ] MEG → MECH 네이밍 일괄 변경
+       - `findstr /s /i "meg" *` 로 대상 파일 전부 탐색 후 변경
+       - domain_registry.json, prompts/*.txt 파일명, 코드 기본값 등
+4. [ ] ZIP 분리 (배포 대상별, PowerShell 스크립트로 제공):
+       - (1) 클라이언트 ZIP — 사용자 PC용 (client/app)
+       - (2) 서버 ZIP — 서버 PC용 (server/db-mcp)
+       - 각각 독립 테스트 가능하게
+5. [ ] 로컬 PC: ZIP 풀고 data/, models/ 추가 → DB MCP 서버 실행 테스트
+6. [ ] 로컬 PC: WinForm 앱 ↔ 서버 통합 테스트 (Gauss로 DB 조회)
+7. [ ] (위 테스트 결과 보고) C# ↔ 서버 연결 수정 — 실제 동작 확인 후 결정
+
+### 다음 버전 (챗봇 정규화)
+8. [ ] 쿼리 재작성 LLM 추가 (Gauss)
+9. [ ] Gauss/GPT 답변 분기:
+       - Gauss → 서버에서 답변 작성 (지금 구조)
+       - GPT → 서버는 검색결과만 반환 → winform GPT가 답변 작성
+10. [ ] meg_chatbot의 검증된 검색 로직을 필요한 것만 골라서 가져오기
+
+### 나중에 다듬기 (급하지 않음)
+- [ ] GPT 로그인 창 깜빡임 제거 (첫 ProbeAsync 전 페이지 로딩 대기)
+- [ ] LLM 선택 → 홈 화면에 뒤로가기 버튼
+- [ ] 설정 페이지: GPT 로그아웃 / 재로그인 버튼
+- [ ] 실제 Gauss/GPT 로고 이미지 교체 (현재 임시 직접그림)
+- [ ] UI 파일 분리 리팩토링 (UiKit/MainForm을 기능별로)
+
+### 2차 배포 (1000명)
+- [ ] 1차 라우터 추가 (RouterClient에 로직 보존됨)
+  - 임시채팅 격리 버그 해결 필요: ResetTemporaryChatAsync가 기존 세션 못 지움
+    → 2번째 질문부터 응답 못읽음 + 이전 맥락 유지(격리 안됨)
+- [ ] DB 내부 라우터 (도메인 판단 LLM)
+- [ ] Rolling Summary 히스토리, Hybrid Retriever, Gauss 스트리밍(SSE)
+- [ ] Gauss rate limit 대응, DB MCP 멀티워커
