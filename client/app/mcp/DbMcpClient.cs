@@ -86,6 +86,62 @@ public class DbMcpClient
         );
     }
 
+    /// <summary>GPT용: 서버가 검색+컨텍스트+프롬프트 조립까지 한 "완성 프롬프트"를 반환. (/mech/ask, for_gpt=true)</summary>
+    public async Task<string> GetGptPromptAsync(string question, string domain, string[] dbKeys, CancellationToken ct = default)
+    {
+        // [임시 검증용] NX_ASSISTANT_FAKE_DBPROMPT=1 이면 서버 호출 없이 예시 프롬프트 반환.
+        //  목적: DB MCP 서버가 없는 VDI 에서 GPT 분기(질문→프롬프트→GPT 답변)를 검증.
+        //  실서버 테스트/배포 시엔 이 환경변수를 끌 것. (자세한 배경: DEV_ENVIRONMENT.md 2장)
+        var fake = Environment.GetEnvironmentVariable("NX_ASSISTANT_FAKE_DBPROMPT");
+        if (!string.IsNullOrEmpty(fake) && fake.Trim() is "1" or "true" or "TRUE")
+        {
+            NxAssistant.Program.Log("[DbMcp] FAKE_DBPROMPT 사용 — 서버 미호출, 예시 프롬프트 반환");
+            return FakeGptPrompt(question);
+        }
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["question"] = question,
+            ["domain"]   = domain,
+            ["case"]     = 1,
+            ["history"]  = Array.Empty<object>(),
+            ["for_gpt"]  = true,
+        };
+        if (dbKeys is { Length: > 0 })
+            payload["db_keys"] = dbKeys;
+
+        var body = JsonSerializer.Serialize(payload);
+        using var req = new HttpRequestMessage(HttpMethod.Post, new Uri(_baseUri, "mech/ask"))
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json")
+        };
+        using var resp = await _http.SendAsync(req, ct);
+        var text = await resp.Content.ReadAsStringAsync(ct);
+
+        if (!resp.IsSuccessStatusCode)
+            throw new InvalidOperationException(
+                $"DB MCP ask(gpt) 오류 {(int)resp.StatusCode}: {text[..Math.Min(200, text.Length)]}");
+
+        using var doc = JsonDocument.Parse(text);
+        return doc.RootElement.TryGetProperty("prompt", out var p) ? p.GetString() ?? "" : "";
+    }
+
+    // [임시 검증용] 서버가 만들 RAG 프롬프트를 흉내낸 예시. 실제 검색 결과 아님(가짜 컨텍스트).
+    private static string FakeGptPrompt(string question) =>
+$@"[테스트용 임시 컨텍스트 — DB MCP 서버 미연결 상태의 예시 데이터입니다]
+아래는 검색된 기구 설계 표준 예시입니다.
+
+- [MS-001] 모바일 외장 설계: 부품 간 최소 유격은 0.15mm 이상 확보한다.
+- [WP-007] 방수 설계 가이드: IP68 달성을 위해 실링 가스켓 압축률은 20~30%로 한다.
+- [FH-012] 폴더블 힌지 표준: 힌지 반복 내구는 20만 회 이상을 만족해야 한다.
+
+위 자료에만 근거해 아래 질문에 한국어로 답하세요.
+자료에 없는 내용은 추측하지 말고 ""자료에 없음""이라고 답하세요.
+(이 답변은 임시 예시 데이터 기반임을 한 줄로 먼저 밝혀 주세요.)
+
+[질문]
+{question}";
+
     /// <summary>도메인의 선택 가능한 db_key 목록 (카드용). GET /mech/dbkeys?domain=X</summary>
     public async Task<List<DbKeyOption>> GetDbKeysAsync(string domain, CancellationToken ct = default)
     {

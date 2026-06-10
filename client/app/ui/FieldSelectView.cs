@@ -8,7 +8,7 @@ namespace NxAssistant.UI;
 // ════════════════════════════════════════════════════════════
 internal sealed class FieldSelectView : Panel
 {
-    public FieldSelectView(Action onDbQuery, Action onNxControl, Action onAuto)
+    public FieldSelectView(Action onBack, Action onDbQuery, Action onNxControl, Action onAuto)
     {
         BackColor = Palette.Bg;
         var body = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = Palette.Bg, ColumnCount = 1, RowCount = 3, Padding = new Padding(0, 40, 0, 0) };
@@ -25,6 +25,6 @@ internal sealed class FieldSelectView : Panel
         body.Controls.Add(TitleBlock.Make("어떤 부분을 도와드릴까요?", "사용할 작업 모드를 선택하세요."), 0, 0);
         body.Controls.Add(cards, 0, 1);
         Controls.Add(body);
-        Controls.Add(new TopBar("\U0001F6E1  AI 설계 어시스턴트"));
+        Controls.Add(new TopBar("\U0001F6E1  AI 설계 어시스턴트", onBack: onBack));
     }
 }

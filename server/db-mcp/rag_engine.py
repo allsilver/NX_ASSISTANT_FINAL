@@ -261,19 +261,23 @@ def setup_design_bot(
 
     no_think_prefix = "" if use_think else "/no_think\n"
 
-    # 기본 답변 체인
+    # 기본 답변 프롬프트/체인
+    #   answer_prompt : 원본 템플릿(GPT 컴포즈 전용). /no_think 등 Gauss 전용 토큰 미포함.
+    #   answer_chain  : (/no_think + 템플릿) | Gauss. Gauss 답변 생성용.
+    #   ※ 검색·컨텍스트·invoke_input 은 rag_handler 에서 공유 → 프롬프트/검색 수정 시 Gauss·GPT 양쪽 자동 반영.
     answer_prompt_file = domain_config.get("prompt_file", "MECH_STANDARD.txt")
-    _answer_template   = no_think_prefix + _load_prompt_template(answer_prompt_file)
-    answer_chain       = ChatPromptTemplate.from_template(_answer_template) | llm | StrOutputParser()
+    _answer_template   = _load_prompt_template(answer_prompt_file)
+    answer_prompt      = ChatPromptTemplate.from_template(_answer_template)
+    answer_chain       = ChatPromptTemplate.from_template(no_think_prefix + _answer_template) | llm | StrOutputParser()
 
-    # 케이스별 전용 체인
-    case_chains: dict[int, object] = {}
+    # 케이스별 전용 프롬프트/체인
+    case_prompts: dict[int, object] = {}
+    case_chains:  dict[int, object] = {}
     for case_str, case_pf in domain_config.get("case_prompts", {}).items():
         try:
-            _ct = no_think_prefix + _load_prompt_template(case_pf)
-            case_chains[int(case_str)] = (
-                ChatPromptTemplate.from_template(_ct) | llm | StrOutputParser()
-            )
+            _ct = _load_prompt_template(case_pf)
+            case_prompts[int(case_str)] = ChatPromptTemplate.from_template(_ct)
+            case_chains[int(case_str)]  = ChatPromptTemplate.from_template(no_think_prefix + _ct) | llm | StrOutputParser()
             print(f"✅ Case {case_str} 체인 로드: {case_pf}")
         except Exception as e:
             print(f"⚠️  Case {case_str} 체인 로드 실패: {e}")
@@ -281,7 +285,7 @@ def setup_design_bot(
     search_client = SearchClient(retriever, vector_dbs, use_reranker)
     print(f"✅ RAG 봇 초기화 완료 (model={model_name}, reranker={use_reranker})")
 
-    def rag_handler(query: str, chat_history: list = None, case: int = 1, synonym_hint: str = "") -> str:
+    def rag_handler(query: str, chat_history: list = None, case: int = 1, synonym_hint: str = "", compose_only: bool = False) -> str:
         raw_docs = search_client._retriever(query)
         if use_reranker:
             scored_docs = _rerank_docs(raw_docs, query)
@@ -306,6 +310,12 @@ def setup_design_bot(
             "synonym_hint": synonym_hint,
             "chat_history": history_text,
         }
+
+        # GPT(컴포즈 전용): Gauss 호출 없이 "완성된 프롬프트 문자열"만 반환.
+        if compose_only:
+            selected_prompt = case_prompts.get(case, answer_prompt)
+            msgs = selected_prompt.format_messages(**invoke_input)
+            return "\n\n".join(getattr(m, "content", str(m)) for m in msgs)
 
         selected_chain = case_chains.get(case, answer_chain)
         return selected_chain.invoke(invoke_input)

@@ -235,6 +235,7 @@ class Handler(BaseHTTPRequestHandler):
             case         = int(payload.get("case", 1))
             history      = payload.get("history", [])        # [{role, content}, ...]
             synonym_hint = str(payload.get("synonym_hint", ""))
+            for_gpt      = bool(payload.get("for_gpt", False))   # True면 Gauss 호출 없이 프롬프트만 반환(GPT용)
 
             if not question:
                 self._send_error(HTTPStatus.BAD_REQUEST, "question required")
@@ -263,20 +264,23 @@ class Handler(BaseHTTPRequestHandler):
 
             try:
                 bot    = _get_or_load_bot(domain_key, db_keys)
-                answer = bot(
+                result = bot(
                     rewritten_q,
                     chat_history = history,
                     case         = case,
                     synonym_hint = synonym_hint,
+                    compose_only = for_gpt,
                 )
-                self._send_json(HTTPStatus.OK, {
+                resp_body = {
                     "question":        question,
                     "rewritten_query": rewritten_q,
                     "domain":          domain_key,
                     "db_keys":         db_keys,
                     "case":            case,
-                    "answer":          answer,
-                })
+                }
+                # GPT: 완성 프롬프트만(prompt) / Gauss: 생성된 답변(answer)
+                resp_body["prompt" if for_gpt else "answer"] = result
+                self._send_json(HTTPStatus.OK, resp_body)
             except Exception as e:
                 logger.error(f"RAG 오류 [{domain_key}]: {e}")
                 self._send_error(HTTPStatus.INTERNAL_SERVER_ERROR, str(e))

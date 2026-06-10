@@ -7,6 +7,29 @@
 
 ## ✅ 완료된 작업
 
+### GPT 분기(서버 검색→GPT 답변) + 홈 뒤로가기 — VDI 검증 완료 (2026-06-10, V2.3)
+
+> 핵심 원칙: **검색·컨텍스트·프롬프트 조립은 서버(rag_engine) 한 곳.** Gauss는 그 프롬프트로 답변 생성, GPT는 같은 프롬프트를 받아 답변 생성. → 프롬프트/검색 로직을 바꾸면 Gauss·GPT 양쪽 자동 반영(어느 LLM 코드도 안 건드림).
+> **VDI 가짜 프롬프트(`NX_ASSISTANT_FAKE_DBPROMPT`)로 클라 파이프라인 검증 완료** — 질문→프롬프트 수신→GPT 답변 정상, 워커 창 숨김 상태에서도 응답 읽기 정상. **서버의 실제 프롬프트 조립은 차주 로컬(GPT+서버)에서 검증 예정.**
+
+- **서버**:
+  - `rag_engine.setup_design_bot`: 원본 프롬프트(answer_prompt/case_prompts)와 Gauss 체인(`/no_think`+템플릿|llm) 분리. `rag_handler(..., compose_only)` 추가 — compose_only면 검색·컨텍스트·invoke_input 은 그대로 하고 **Gauss 호출 대신 완성 프롬프트 문자열 반환**. (`/no_think` 는 Gauss 전용이라 GPT 프롬프트엔 미포함)
+  - `server.py /mech/ask`: `for_gpt` 플래그 추가 → true면 `{prompt}`, 아니면 `{answer}` 반환.
+- **클라이언트**:
+  - `DbMcpClient.GetGptPromptAsync()` (/mech/ask, for_gpt=true → prompt 파싱).
+  - `LlmSession.AskAsync`: **GPT면** 서버에서 프롬프트 받아 → GPT 워커가 답변 생성. **Gauss면** 기존대로. 도메인/db_keys 를 LlmSession 에도 보관(GPT 프롬프트 요청용). ChatView 는 변경 없음.
+  - 1차: 대화 히스토리는 빈 값으로 전송(컨텍스트+현재 질문). GPT 웹 세션 자체 맥락에 의존.
+- **홈 뒤로가기**: `FieldSelectView` 에 ← 추가 → AI 모델 재선택(`ShowAiSelect`). MainForm/PreviewShell 배선.
+- **DB세부선택 문구**: `DbKeyPrompts` 도메인 분기 제거 → 전 도메인 공통 "어떤 항목에 관심이 있나요?" / "선택한 범위로 검색합니다. (복수선택 가능)". 카드만 서버 db json 으로 달라짐.
+- **테스트/진단 플래그** (DEV_ENVIRONMENT.md 2장):
+  - `NX_ASSISTANT_FAKE_DBPROMPT=1` : 서버 없이 예시 프롬프트로 GPT 분기 검증(VDI용). **실서버 테스트 시 끌 것.**
+  - `NX_ASSISTANT_SHOW_WORKER=1` : GPT 워커 창을 띄워 관찰(디버그).
+  - `WorkerForm.ChatAsync` 단계별 로그(`%LOCALAPPDATA%\NX_Assistant\logs\nx-assistant.log`).
+- **남은 작업 / 주의**:
+  - [ ] 차주 로컬(GPT+서버)에서 GPT 분기 실서버 검증(`FAKE_DBPROMPT` 끄고 실제 프롬프트 수신).
+  - [ ] 긴 RAG 컨텍스트를 ChatGPT 웹 입력창에 붙일 때 길이/붙여넣기 이슈 가능 → 길면 컨텍스트 길이 제한 검토.
+
+
 ### DB세부선택 UI 확정 + 본앱 통합 + 설정 페이지 + 서버 가드 — 코드 작성 (2026-06-10)
 
 > 프리뷰에서 DB세부선택(관심분야) 카드 UI 확정(여러 번 반복 — 레이아웃 함정은 DEV_ENVIRONMENT.md 3-3 참조).
@@ -156,7 +179,7 @@
 
 ### 나중에 다듬기 (급하지 않음)
 - [ ] GPT 로그인 창 깜빡임 제거 (첫 ProbeAsync 전 페이지 로딩 대기)
-- [ ] LLM 선택 → 홈 화면에 뒤로가기 버튼
+- [x] LLM 선택 → 홈 화면 뒤로가기 버튼 (2026-06-10 완료: 홈에서 ← 누르면 AI 모델 재선택)
 - [ ] **도메인 목록 서버화** (다우니 요청): 현재 `DomainSelectView.cs`에 4개 도메인(키·이름·설명·아이콘) 하드코딩.
       서버 `GET /mech/domains`(key/display_name/description 제공)로 받아오도록 변경. 단 아이콘(IconKind)은 서버에 없으니 "도메인키→아이콘" 매핑만 클라에 유지.
       → 같이 볼 것: `DbKeyPrompts.For()`(도메인별 페이지 문구)도 도메인 키에 묶여 있어, 도메인 동적화 시 처리 방안 필요.

@@ -52,7 +52,13 @@ public class GptProvider : ILlmProvider
         if (!IsReady)
             throw new InvalidOperationException("GPT가 준비되지 않았습니다. 로그인 창에서 로그인하세요.");
 
-        _userWorker.ParkOffscreen();
+        // [디버그] NX_ASSISTANT_SHOW_WORKER=1 이면 워커 창을 띄워 동작을 직접 관찰 (평소엔 화면 밖).
+        var show = Environment.GetEnvironmentVariable("NX_ASSISTANT_SHOW_WORKER");
+        if (!string.IsNullOrEmpty(show) && show.Trim() is "1" or "true" or "TRUE")
+            _userWorker.ShowForLogin();
+        else
+            _userWorker.ParkOffscreen();
+
         return await _userWorker.ChatAsync(prompt);
     }
 

@@ -4,6 +4,7 @@
 // - GPT는 WorkerForm(로그인) 생성/공유 → 도메인 바꿔도 로그인 1회
 // - 도메인 바꿔도 LLM 설정 유지 (앱 전역 1개)
 
+using NxAssistant.Mcp;
 using NxAssistant.UI;
 
 namespace NxAssistant.Providers;
@@ -16,6 +17,10 @@ public sealed class LlmSession : ILlmSession, IDisposable
     private WorkerForm? _gptWorker;       // GPT 로그인/채팅 워커 (공유)
     private GptProvider? _gptProvider;
     private GaussProvider? _gaussProvider;
+
+    private readonly DbMcpClient _dbMcp = new();          // GPT 답변용 프롬프트를 서버에서 받아옴
+    private string   _domain = "";                        // 현재 도메인 (GPT 프롬프트 요청에 사용)
+    private string[] _dbKeys = Array.Empty<string>();     // 현재 db_keys (GPT 프롬프트 요청에 사용)
 
     public LlmSession(string initial = "Gauss")
     {
@@ -90,22 +95,36 @@ public sealed class LlmSession : ILlmSession, IDisposable
         return await _gptProvider.ProbeReadyAsync();
     }
 
-    /// <summary>현재 Provider로 질의.</summary>
-    public Task<string> AskAsync(string prompt, CancellationToken ct = default)
-        => Provider.ChatAsync(prompt, ct);
-
-    /// <summary>DB 도메인 키 설정. Gauss DB조회 시 /mech/ask 에 실린다.</summary>
-    public void SetDomain(string domain)
+    /// <summary>
+    /// 현재 Provider로 질의.
+    ///  - Gauss: 서버 /mech/ask 가 검색+답변까지 (질문 원문 전달).
+    ///  - GPT  : 서버에서 검색+프롬프트 조립(for_gpt)만 받아, 그 프롬프트로 GPT 가 답변 생성.
+    /// </summary>
+    public async Task<string> AskAsync(string prompt, CancellationToken ct = default)
     {
-        _gaussProvider ??= new GaussProvider();
-        _gaussProvider.Domain = domain ?? "";
+        if (IsGpt)
+        {
+            var composed = await _dbMcp.GetGptPromptAsync(prompt, _domain, _dbKeys, ct);
+            if (string.IsNullOrWhiteSpace(composed)) composed = prompt;   // 안전장치(서버 빈 응답 시 원문)
+            return await Provider.ChatAsync(composed, ct);
+        }
+        return await Provider.ChatAsync(prompt, ct);
     }
 
-    /// <summary>선택된 db_key 목록 설정. Gauss /mech/ask 의 db_keys 로 실린다. (비어있으면 서버 전체 검색)</summary>
+    /// <summary>DB 도메인 키 설정. Gauss /mech/ask + GPT 프롬프트 요청에 실린다.</summary>
+    public void SetDomain(string domain)
+    {
+        _domain = domain ?? "";
+        _gaussProvider ??= new GaussProvider();
+        _gaussProvider.Domain = _domain;
+    }
+
+    /// <summary>선택된 db_key 목록 설정. Gauss /mech/ask + GPT 프롬프트 요청에 실린다. (비어있으면 서버 전체 검색)</summary>
     public void SetDbKeys(string[] keys)
     {
+        _dbKeys = keys ?? Array.Empty<string>();
         _gaussProvider ??= new GaussProvider();
-        _gaussProvider.DbKeys = keys ?? Array.Empty<string>();
+        _gaussProvider.DbKeys = _dbKeys;
     }
 
     public void Dispose()

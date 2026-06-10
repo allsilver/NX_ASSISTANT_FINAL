@@ -17,14 +17,11 @@ using NxAssistant.Mcp;
 namespace NxAssistant.UI;
 
 // 도메인별 관심분야 페이지 문구 (MainForm / PreviewShell 공용)
+//   전 도메인 공통 고정 문구. 카드 내용만 서버 db json 으로 자동으로 달라진다(제목/소제목은 불변).
 internal static class DbKeyPrompts
 {
-    public static (string title, string subtitle) For(string domain) => domain switch
-    {
-        "MECH_STANDARD" => ("어떤 표준에 관심이 있나요?", "선택한 분야의 표준을 검색합니다. (복수선택 가능)"),
-        "MECHA_DFM"     => ("어떤 설계를 고려할까요?",   "선택한 설계 기준으로 검색합니다. (복수선택 가능)"),
-        _               => ("검색 범위를 선택하세요",    "검색할 세부 DB를 선택하세요. (복수선택 가능)"),
-    };
+    public static (string title, string subtitle) For(string domain)
+        => ("어떤 항목에 관심이 있나요?", "선택한 범위로 검색합니다. (복수선택 가능)");
 }
 
 internal sealed class DbKeySelectView : Panel

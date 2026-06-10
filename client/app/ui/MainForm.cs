@@ -106,6 +106,7 @@ public sealed class MainForm : Form
     private void ShowFieldSelect()
     {
         var view = new FieldSelectView(
+            onBack:      ShowAiSelect,
             onDbQuery:   ShowDomainSelect,
             onNxControl: () => MessageBox.Show("NX 제어는 준비 중입니다.", "안내"),
             onAuto:      () => MessageBox.Show("자동화 기능은 준비 중입니다.", "안내"));

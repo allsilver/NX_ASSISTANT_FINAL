@@ -149,25 +149,33 @@ public sealed class WorkerForm : Form
     {
         await InitializeAsync();
         var before = await LatestAssistantTextAsync();
+        NxAssistant.Program.Log($"[Worker] 전송 시도 (프롬프트 {message.Length}자)");
         if (!await SendMessageAsync(message))
+        {
+            NxAssistant.Program.Log("[Worker] 전송 실패: composer/send 버튼 미발견");
             throw new InvalidOperationException("ChatGPT composer에 메시지를 보낼 수 없습니다.");
+        }
+        NxAssistant.Program.Log("[Worker] 전송 완료 → 응답 폴링 시작 (최대 90초, 1.2초 간격)");
 
         var deadline    = DateTime.UtcNow.AddSeconds(90);
         var last        = "";
         var stableCount = 0;
+        var polls       = 0;
 
         while (DateTime.UtcNow < deadline)
         {
             await Task.Delay(1200);
+            polls++;
             var current = await LatestAssistantTextAsync();
             if (IsTransient(current)) continue;
             if (!string.IsNullOrWhiteSpace(current) && current != before)
             {
                 if (current == last) stableCount++;
-                else { last = current; stableCount = 0; }
-                if (stableCount >= 2) return current;
+                else { last = current; stableCount = 0; NxAssistant.Program.Log($"[Worker] 응답 갱신 중 ({last.Length}자, {polls}회)"); }
+                if (stableCount >= 2) { NxAssistant.Program.Log($"[Worker] 응답 확정 ({current.Length}자, 폴링 {polls}회)"); return current; }
             }
         }
+        NxAssistant.Program.Log($"[Worker] 90초 타임아웃 (폴링 {polls}회, last={last.Length}자, before와 동일?={last == before})");
         if (!string.IsNullOrWhiteSpace(last)) return last;
         throw new TimeoutException("ChatGPT 응답 타임아웃");
     }
