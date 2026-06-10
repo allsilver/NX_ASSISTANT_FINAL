@@ -8,7 +8,7 @@ using NxAssistant.UI;
 
 namespace NxAssistant.Providers;
 
-public sealed class LlmSession : IDisposable
+public sealed class LlmSession : ILlmSession, IDisposable
 {
     public string       Current  { get; private set; } = "Gauss";
     public ILlmProvider Provider { get; private set; }
@@ -99,6 +99,13 @@ public sealed class LlmSession : IDisposable
     {
         _gaussProvider ??= new GaussProvider();
         _gaussProvider.Domain = domain ?? "";
+    }
+
+    /// <summary>선택된 db_key 목록 설정. Gauss /mech/ask 의 db_keys 로 실린다. (비어있으면 서버 전체 검색)</summary>
+    public void SetDbKeys(string[] keys)
+    {
+        _gaussProvider ??= new GaussProvider();
+        _gaussProvider.DbKeys = keys ?? Array.Empty<string>();
     }
 
     public void Dispose()

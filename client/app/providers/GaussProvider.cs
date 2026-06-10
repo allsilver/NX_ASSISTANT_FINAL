@@ -18,6 +18,9 @@ public class GaussProvider : ILlmProvider
     /// <summary>현재 DB 도메인 키. /mech/ask 요청에 실림. (LlmSession.SetDomain 으로 설정)</summary>
     public string Domain  { get; set; } = "";
 
+    /// <summary>검색할 db_key 목록. 비어있으면 서버가 도메인 전체 검색. (LlmSession.SetDbKeys 로 설정)</summary>
+    public string[] DbKeys { get; set; } = Array.Empty<string>();
+
     private readonly HttpClient _http;
     private readonly string     _dbMcpUrl;
     private readonly string     _token;
@@ -48,13 +51,15 @@ public class GaussProvider : ILlmProvider
     /// </summary>
     public async Task<string> ChatAsync(string prompt, CancellationToken ct = default)
     {
-        var payload = new
+        var payload = new Dictionary<string, object?>
         {
-            question = prompt,
-            domain   = Domain,
-            @case    = 1,
-            history  = Array.Empty<object>(),
+            ["question"] = prompt,
+            ["domain"]   = Domain,
+            ["case"]     = 1,
+            ["history"]  = Array.Empty<object>(),
         };
+        if (DbKeys is { Length: > 0 })
+            payload["db_keys"] = DbKeys;
         var body = JsonSerializer.Serialize(payload);
         using var req = new HttpRequestMessage(HttpMethod.Post,
             new Uri(new Uri(_dbMcpUrl), "/mech/ask"))

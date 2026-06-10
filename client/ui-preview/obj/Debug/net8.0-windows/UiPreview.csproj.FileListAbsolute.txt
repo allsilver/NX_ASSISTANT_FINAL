@@ -1,0 +1,15 @@
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\bin\Debug\net8.0-windows\UiPreview.exe
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\bin\Debug\net8.0-windows\UiPreview.deps.json
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\bin\Debug\net8.0-windows\UiPreview.runtimeconfig.json
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\bin\Debug\net8.0-windows\UiPreview.dll
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\bin\Debug\net8.0-windows\UiPreview.pdb
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\obj\Debug\net8.0-windows\UiPreview.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\obj\Debug\net8.0-windows\UiPreview.AssemblyInfoInputs.cache
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\obj\Debug\net8.0-windows\UiPreview.AssemblyInfo.cs
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\obj\Debug\net8.0-windows\UiPreview.csproj.CoreCompileInputs.cache
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\obj\Debug\net8.0-windows\UiPreview.sourcelink.json
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\obj\Debug\net8.0-windows\UiPreview.dll
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\obj\Debug\net8.0-windows\refint\UiPreview.dll
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\obj\Debug\net8.0-windows\UiPreview.pdb
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\obj\Debug\net8.0-windows\UiPreview.genruntimeconfig.cache
+C:\Users\daeun.seo\Documents\GitHub\NX_ASSISTANT_FINAL\client\ui-preview\obj\Debug\net8.0-windows\ref\UiPreview.dll

@@ -86,6 +86,35 @@ public class DbMcpClient
         );
     }
 
+    /// <summary>도메인의 선택 가능한 db_key 목록 (카드용). GET /mech/dbkeys?domain=X</summary>
+    public async Task<List<DbKeyOption>> GetDbKeysAsync(string domain, CancellationToken ct = default)
+    {
+        var uri = new Uri(_baseUri, "mech/dbkeys?domain=" + Uri.EscapeDataString(domain));
+        using var resp = await _http.GetAsync(uri, ct);
+        var text = await resp.Content.ReadAsStringAsync(ct);
+
+        if (!resp.IsSuccessStatusCode)
+            throw new InvalidOperationException(
+                $"DB MCP dbkeys 오류 {(int)resp.StatusCode}: {text[..Math.Min(200, text.Length)]}");
+
+        var list = new List<DbKeyOption>();
+        using var doc = JsonDocument.Parse(text);
+        if (doc.RootElement.TryGetProperty("db_options", out var arr) && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var it in arr.EnumerateArray())
+            {
+                var key = GetStr(it, "key");
+                if (string.IsNullOrEmpty(key)) continue;
+                list.Add(new DbKeyOption(
+                    Key:         key,
+                    DisplayName: it.TryGetProperty("display_name", out var dn) ? dn.GetString() ?? key : key,
+                    Description: it.TryGetProperty("description", out var d)   ? d.GetString()  ?? "" : "",
+                    Default:     it.TryGetProperty("default", out var df) && df.ValueKind == JsonValueKind.True));
+            }
+        }
+        return list;
+    }
+
     /// <summary>서버 상태 확인</summary>
     public async Task<bool> HealthCheckAsync(CancellationToken ct = default)
     {

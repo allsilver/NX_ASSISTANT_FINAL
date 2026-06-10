@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- UI 프리뷰 (개발 전용)
+       - 본 앱(client/app)의 "순수 UI" 코드를 링크해서 같이 컴파일 → 화면 코드 1벌 공유
+       - 서버/WebView2 의존 없음. 데이터·LLM 답변은 MockLlmSession + mock 옵션으로 대체
+       - 실행: cd client/ui-preview ; dotnet run   (VDI 에서 가볍게 빌드/확인) -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>UiPreview</AssemblyName>
+    <RootNamespace>NxAssistant</RootNamespace>
+  </PropertyGroup>
+
+  <!-- 본 앱의 공유 UI 코드 (서버/WebView2 의존 없는 파일만 선별 링크) -->
+  <ItemGroup>
+    <Compile Include="..\app\ui\UiKit.cs"            Link="shared\UiKit.cs" />
+    <Compile Include="..\app\ui\AiSelectView.cs"     Link="shared\AiSelectView.cs" />
+    <Compile Include="..\app\ui\FieldSelectView.cs"  Link="shared\FieldSelectView.cs" />
+    <Compile Include="..\app\ui\DomainSelectView.cs" Link="shared\DomainSelectView.cs" />
+    <Compile Include="..\app\ui\DbKeySelectView.cs"  Link="shared\DbKeySelectView.cs" />
+    <Compile Include="..\app\ui\ChatView.cs"         Link="shared\ChatView.cs" />
+    <Compile Include="..\app\ui\SettingsView.cs"     Link="shared\SettingsView.cs" />
+    <Compile Include="..\app\providers\ILlmSession.cs" Link="shared\ILlmSession.cs" />
+    <Compile Include="..\app\mcp\DbKeyOption.cs"     Link="shared\DbKeyOption.cs" />
+    <Compile Include="..\app\config\DbKeySelectionStore.cs" Link="shared\DbKeySelectionStore.cs" />
+  </ItemGroup>
+
+</Project>

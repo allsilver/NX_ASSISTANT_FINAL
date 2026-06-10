@@ -1,11 +1,56 @@
 # NX Assistant 개발 진행상황
 
-> 최종 업데이트: 2026-06-09
+> 최종 업데이트: 2026-06-10
 > 진행 상황과 다음 할 일만 기록합니다. 프로젝트 구조·환경·규칙은 CLAUDE.md 참조.
 
 ---
 
 ## ✅ 완료된 작업
+
+### DB세부선택 UI 확정 + 본앱 통합 + 설정 페이지 + 서버 가드 — 코드 작성 (2026-06-10)
+
+> 프리뷰에서 DB세부선택(관심분야) 카드 UI 확정(여러 번 반복 — 레이아웃 함정은 DEV_ENVIRONMENT.md 3-3 참조).
+> 본앱 배선 + 설정 페이지 + 서버 미연결 가드까지 코드 반영. **로컬 DB 서버 띄운 상태의 실동작 검증은 아직(서버 연결돼야 카드가 채워짐).**
+
+- **DB세부선택 UI 확정** (`DbKeySelectView.cs`): 2열 50/50 그리드(상단 고정·중앙정렬, 하단 스페이서), 카드 선택색(흰→옅은하늘+남색테두리), 우하단 "N개 선택됨", 제목/안내(고정아님-AutoSize 한 줄 라벨 줄단위 쌓기로 balloon/clip 모두 회피), 메뉴경로 칩 블록, 도메인 선택 페이지와 제목 높이 정렬.
+- **본앱 통합**:
+  - `DbMcpClient.GetDbKeysAsync()` (GET /mech/dbkeys), `GaussProvider.DbKeys` + /mech/ask 에 db_keys 동봉, `LlmSession.SetDbKeys()`.
+  - `MainForm`: 도메인 선택 → (서버 옵션 ≥2면) 관심분야 페이지 → 채팅. **복수 DB 도메인 하드코딩 제거 → 서버 /mech/dbkeys 결과로 판단**. 선택은 `DbKeySelectionStore` 로컬 저장 → **도메인당 1회만 표시, 이후 유지**.
+  - `DbKeyPrompts.For()` 도메인별 문구를 MainForm/PreviewShell 공용으로.
+- **설정 페이지** (`SettingsView.cs`): "관심분야 재설정"(force 재표시) / "외부 AI 재로그인"(현재 AI선택 재진입-임시). 채팅 ⚙ → 설정 연결. ChatView 에 onSettings 콜백 추가.
+- **서버 미연결 가드** (`MainForm.StartUp`): 앱 시작 시 `/health` 확인 → 실패 시 "서버 연결 불가" 화면으로 진입 차단. **VDI(`NX_ASSISTANT_MODE=vdi`)는 예외.**
+- **남은 작업**:
+  - [ ] 로컬 DB 서버 띄우고 본앱 실동작 검증(설계수순서/DFM 카드, 나머지 스킵, 1회표시·유지, 서버 끄면 차단화면).
+  - [ ] (TODO) 도메인 목록 서버화(/mech/domains), AiSelectView 모델 라벨 정리, 설정 동작 자연스럽게 — 아래 목록 참조.
+
+
+### UI 프리뷰 + 화면 분리 리팩토링 — 코드 작성 (VDI 빌드·렌더 확인 전) (2026-06-10)
+
+> UI 를 많이 손볼 예정이라, 서버 없이 전 페이지를 띄워 빠르게 보고 고치는 프리뷰를 먼저 만듦.
+> **아직 VDI 빌드/렌더 확인 안 함.** db_keys "본 앱 통합"(MainForm 배선, GaussProvider/LlmSession/DbMcpClient db_keys)은
+> UI 확정 후로 미룸 — 지금은 동작 안 바뀌는 리팩토링 + 프리뷰만.
+
+- **구조 리팩토링 (동작 불변)**:
+  - `MainForm.cs` 의 4개 View 를 파일 분리 → `AiSelectView.cs` / `FieldSelectView.cs` / `DomainSelectView.cs` / `ChatView.cs`
+  - `ChatView` 가 `LlmSession`(서버/WebView2 의존) 대신 신규 `ILlmSession` 인터페이스에 의존 → 프리뷰서 Mock 주입 가능
+  - `LlmSession : ILlmSession` 구현 (멤버는 그대로)
+  - `DbKeyOption` 레코드를 `mcp/DbKeyOption.cs` 로 분리 (네트워크 의존 없음 → 프리뷰 공유)
+- **신규: UI 프리뷰 프로젝트** `client/ui-preview/` (별도 csproj, WebView2/서버 없음)
+  - `app/` 의 순수 UI 파일(UiKit, 4 View, DbKeySelectView, ILlmSession, DbKeyOption, DbKeySelectionStore)을 **링크**해 공유
+  - `PreviewShell` 이 MainForm 흐름을 mock 으로 재현: AI선택 → 분야 → 도메인 → **DB세부선택(mock 옵션)** → 채팅
+  - `MockLlmSession` 가짜 답변 / db_key 는 mock 옵션(MECH_STANDARD·MECHA_DFM 복수, CMF_* 단일→건너뜀)
+  - 실행: `cd client/ui-preview ; dotnet run`
+- **개발 방식 문서화**: DEV_ENVIRONMENT.md 3-1(UI 독립 테스트 우선) / 3-2(진행 전 확인) 추가
+- **남은 작업**:
+  - [ ] VDI 에서 `client/ui-preview` 빌드/실행 → 전 페이지 + DB선택 카드 UI 확인·수정 (반복)
+  - [ ] (UI 확정 후) db_keys 본 앱 통합: MainForm 에 DB세부선택 배선 + GaussProvider/LlmSession/DbMcpClient db_keys + ask 동봉
+  - [ ] 본 앱(`client/app`) 빌드도 통과하는지 확인 (리팩토링 후)
+
+### db_keys 서버측 (2026-06-09, 이전)
+
+> 서버는 이미 `/mech/dbkeys` + ask 의 db_keys 수용 완료 (아래 "DB 선택(db_key) 방식" 참조).
+> 클라 통합은 위 UI 확정 후 진행.
+
 
 ### 1차 client 연결 (Gauss DB조회) — 코드 작성 (2026-06-09)
 
@@ -112,7 +157,13 @@
 ### 나중에 다듬기 (급하지 않음)
 - [ ] GPT 로그인 창 깜빡임 제거 (첫 ProbeAsync 전 페이지 로딩 대기)
 - [ ] LLM 선택 → 홈 화면에 뒤로가기 버튼
+- [ ] **도메인 목록 서버화** (다우니 요청): 현재 `DomainSelectView.cs`에 4개 도메인(키·이름·설명·아이콘) 하드코딩.
+      서버 `GET /mech/domains`(key/display_name/description 제공)로 받아오도록 변경. 단 아이콘(IconKind)은 서버에 없으니 "도메인키→아이콘" 매핑만 클라에 유지.
+      → 같이 볼 것: `DbKeyPrompts.For()`(도메인별 페이지 문구)도 도메인 키에 묶여 있어, 도메인 동적화 시 처리 방안 필요.
+- [ ] `AiSelectView` 의 "gauss:o4-instruct 모델" 라벨이 하드코딩 — 서버 registry(`available_models`)와 어긋날 수 있음. 표시용이라 급하진 않으나 정리 대상.
 - [ ] 설정 페이지: GPT 로그아웃 / 재로그인 버튼
+- [ ] 설정 페이지 동작 자연스럽게 다듬기 (다우니 요청): "관심분야 재설정"·"외부 AI 재로그인"의 진입/복귀 흐름 매끄럽게.
+      현재 외부 AI 재로그인 = AI 선택 화면 재진입(임시). GPT 세션만 조용히 재로그인하는 방식 등 검토.
 - [ ] 실제 Gauss/GPT 로고 이미지 교체 (현재 임시 직접그림)
 - [ ] UI 파일 분리 리팩토링 (UiKit/MainForm을 기능별로)
 

@@ -246,9 +246,13 @@ internal sealed class CheckItem : Control
 internal sealed class NavButton : Control
 {
     private readonly NavIcon _icon; private bool _hover;
-    public NavButton(NavIcon icon)
+    private readonly Color _barColor, _btnFill, _btnHover;
+    public NavButton(NavIcon icon, Color? barColor = null, Color? btnFill = null, Color? btnHover = null)
     {
         _icon = icon; Cursor = Cursors.Hand;
+        _barColor = barColor ?? Palette.Accent;
+        _btnFill  = btnFill  ?? Palette.AccentSoft;
+        _btnHover = btnHover ?? Color.FromArgb(55,85,135);
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
                | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
         MouseEnter += (_, _) => { _hover = true; Invalidate(); };
@@ -257,11 +261,11 @@ internal sealed class NavButton : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
-        using (var bg = new SolidBrush(Palette.Accent)) g.FillRectangle(bg, ClientRectangle);
+        using (var bg = new SolidBrush(_barColor)) g.FillRectangle(bg, ClientRectangle);
         int box=32, x=(Width-box)/2, y=(Height-box)/2;
         var rect = new Rectangle(x, y, box, box);
         using (var path = RoundedPanel.Rounded(rect, 8))
-        using (var fill = new SolidBrush(_hover ? Color.FromArgb(55,85,135) : Palette.AccentSoft))
+        using (var fill = new SolidBrush(_hover ? _btnHover : _btnFill))
             g.FillPath(fill, path);
         using var pen = new Pen(Color.White, 2f){ StartCap=LineCap.Round, EndCap=LineCap.Round, LineJoin=LineJoin.Round };
         using var w = new SolidBrush(Color.White);
@@ -283,7 +287,7 @@ internal sealed class NavButton : Control
                 for (int i=0;i<8;i++){ var st=g.Save(); g.TranslateTransform(cx,cy); g.RotateTransform(45f*i);
                     g.FillRectangle(w, -gr*0.20f, -gr*1.15f, gr*0.40f, gr*0.5f); g.Restore(st); }
                 g.FillEllipse(w, cx-gr*0.72f, cy-gr*0.72f, gr*1.44f, gr*1.44f);
-                using (var hole = new SolidBrush(_hover ? Color.FromArgb(55,85,135) : Palette.AccentSoft))
+                using (var hole = new SolidBrush(_hover ? _btnHover : _btnFill))
                     g.FillEllipse(hole, cx-gr*0.34f, cy-gr*0.34f, gr*0.68f, gr*0.68f);
                 break;
         }
@@ -353,9 +357,10 @@ internal sealed class SendButton : Control
 
 internal sealed class TopBar : Panel
 {
-    public TopBar(string title, Action? onBack = null, Action? onHome = null)
+    public TopBar(string title, Action? onBack = null, Action? onHome = null,
+                  Color? barColor = null, Color? navFill = null, Color? navHover = null)
     {
-        Dock = DockStyle.Top; Height = 50; BackColor = Palette.Accent;
+        Dock = DockStyle.Top; Height = 50; BackColor = barColor ?? Palette.Accent;
         var titleLabel = new Label
         {
             Text = title, ForeColor = Color.White,
@@ -366,12 +371,12 @@ internal sealed class TopBar : Panel
         Controls.Add(titleLabel);
         if (onHome != null)
         {
-            var home = new NavButton(NavIcon.Home) { Dock = DockStyle.Left, Width = 46 };
+            var home = new NavButton(NavIcon.Home, barColor, navFill, navHover) { Dock = DockStyle.Left, Width = 46 };
             home.Click += (_, _) => onHome(); Controls.Add(home); home.BringToFront();
         }
         if (onBack != null)
         {
-            var back = new NavButton(NavIcon.Back) { Dock = DockStyle.Left, Width = 46 };
+            var back = new NavButton(NavIcon.Back, barColor, navFill, navHover) { Dock = DockStyle.Left, Width = 46 };
             back.Click += (_, _) => onBack(); Controls.Add(back); back.BringToFront();
         }
         titleLabel.BringToFront();

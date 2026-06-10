@@ -46,16 +46,23 @@ Siemens NX(기계설계 CAD) 안에서 동작하는 AI 어시스턴트.
 ## 4. 화면 흐름 (1차 배포 UI)
 
 ```
-AI 선택 (Gauss/GPT)         ← 앱 시작 시, 최초 1회
+(앱 시작) DB 서버 연결 확인 ── 실패(배포 환경) → "서버 연결 불가" 화면(진입 차단)
+   │                         └ VDI(NX_ASSISTANT_MODE=vdi)는 체크 예외
+   ↓ (연결 OK)
+AI 선택 (Gauss/GPT)         ← 최초 1회
    ↓
 분야 선택 (DB조회/NX제어/자동화)
    ↓ (DB조회 선택 시)
 DB 도메인 선택 (설계수순서/DFC/CMF/DFM)
+   ↓ (서버 /mech/dbkeys 옵션이 2개 이상인 도메인 = 설계수순서/DFM 만)
+관심분야(db_key) 복수선택   ← 도메인당 최초 1회. 선택은 로컬 저장 → 이후 자동 스킵(유지)
    ↓
-채팅
+채팅 ── (⚙ 설정) → 설정 (관심분야 재설정 / 외부 AI 재로그인)
 ```
 
 - LLM 선택은 앱 전역 1개 설정. 도메인 바꿔도 유지. GPT 워커 1개 공유(로그인 1회).
+- 어느 도메인이 복수 DB인지는 **하드코딩하지 않고 서버 /mech/dbkeys 결과로 판단**(옵션 ≥2 → 페이지).
+- "관심분야 재설정"은 저장값이 있어도 페이지를 다시 띄움(force).
 - 1차 배포: 라우터 없음. 사용자가 모드/도메인 직접 선택.
 
 ---
@@ -67,20 +74,35 @@ NX_ASSISTANT_FINAL/
 ├── client/app/                     ← 사용자 PC 전용
 │   ├── ui/
 │   │   ├── UiKit.cs                 ← 공통 UI 컴포넌트 (Palette, 카드, 아이콘, 버튼 등)
-│   │   ├── MainForm.cs              ← 화면 전환 + 4개 View
+│   │   ├── MainForm.cs              ← 화면 전환 셸 (시작 시 서버 연결확인, db_key/설정 흐름 배선)
+│   │   ├── AiSelectView.cs          ← 화면 0: AI 선택 (순수 UI)
+│   │   ├── FieldSelectView.cs       ← 화면 1: 분야 선택 (순수 UI)
+│   │   ├── DomainSelectView.cs      ← 화면 2: DB 도메인 선택 (순수 UI, 도메인 목록은 현재 하드코딩)
+│   │   ├── DbKeySelectView.cs       ← 화면 2.5: db_key 복수선택 (본앱 배선 완료, 서버 /mech/dbkeys 기반)
+│   │   ├── ChatView.cs              ← 화면 3: 채팅 (ILlmSession 의존, ⚙→설정 콜백)
+│   │   ├── SettingsView.cs          ← 설정 화면 (관심분야 재설정 / 외부 AI 재로그인)
 │   │   └── WorkerForm.cs            ← GPT WebView2 워커 (로그인/채팅)
 │   ├── providers/
 │   │   ├── ILlmProvider.cs          ← 인터페이스
+│   │   ├── ILlmSession.cs           ← 채팅이 의존하는 세션 인터페이스 (ChatView ↔ Mock 분리)
 │   │   ├── GaussProvider.cs         ← Gauss (서버 경유)
 │   │   ├── GptProvider.cs           ← GPT (WorkerForm 래핑, userWorker만)
-│   │   └── LlmSession.cs            ← 앱 전역 LLM 선택 관리
+│   │   └── LlmSession.cs            ← 앱 전역 LLM 선택 관리 (ILlmSession 구현)
 │   ├── mcp/
 │   │   ├── DbMcpClient.cs           ← DB 서버 HTTP 요청 (/mech/ask 등)
+│   │   ├── DbKeyOption.cs           ← db_key 메타 레코드 (카드/프리뷰 공유, 네트워크 의존 없음)
 │   │   └── NxMcpClient.cs           ← NX MCP 호출
 │   ├── history/HistoryManager.cs    ← 대화 히스토리
+│   ├── config/DbKeySelectionStore.cs← 도메인별 선택 db_key 로컬 저장 (%LOCALAPPDATA%\NX_Assistant\db_selection.json)
 │   ├── router/RouterClient.cs       ← (1차 배포 미사용, 2차 라우터용 보존)
 │   ├── Program.cs                   ← MainForm 실행
 │   └── NxAssistant.csproj
+│
+├── client/ui-preview/              ← UI 프리뷰 (개발 전용, 서버/WebView2 없음)
+│   ├── UiPreview.csproj            ← app/ 의 순수 UI 파일을 링크해 컴파일
+│   ├── Program.cs                  ← PreviewShell 실행
+│   ├── PreviewShell.cs             ← MainForm 흐름을 mock 으로 흉내 (전 페이지 연결)
+│   └── MockLlmSession.cs           ← ILlmSession mock (가짜 답변)
 │
 ├── server/                         ← 서버 PC 전용 (RAG). 이 폴더만 서버 PC로 복사
 │   ├── db-mcp/
