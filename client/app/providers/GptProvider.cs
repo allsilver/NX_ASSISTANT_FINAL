@@ -62,6 +62,25 @@ public class GptProvider : ILlmProvider
         return await _userWorker.ChatAsync(prompt);
     }
 
+    // 스트리밍: 워커가 내보내는 누적 스냅샷을 그대로 흘려보냄.
+    public async IAsyncEnumerable<string> ChatStreamAsync(string prompt, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        if (!IsReady)
+            throw new InvalidOperationException("GPT가 준비되지 않았습니다. 로그인 창에서 로그인하세요.");
+
+        var show = Environment.GetEnvironmentVariable("NX_ASSISTANT_SHOW_WORKER");
+        if (!string.IsNullOrEmpty(show) && show.Trim() is "1" or "true" or "TRUE")
+            _userWorker.ShowForLogin();
+        else
+            _userWorker.ParkOffscreen();
+
+        await foreach (var snapshot in _userWorker.ChatStreamAsync(prompt, ct))
+            yield return snapshot;
+    }
+
+    // 마지막(새) 답변의 서식(markdown) — 스트리밍 완료 후 호출
+    public Task<string> LastMarkdownAsync() => _userWorker.LastAnswerMarkdownAsync();
+
     // [1차 배포 미사용] 라우터 격리 호출. 라우터 재도입 시 routerWorker로 복원.
     public Task<string> AskIsolatedAsync(string prompt, CancellationToken ct = default)
         => throw new NotSupportedException("AskIsolatedAsync는 1차 배포에서 사용하지 않습니다 (라우터 미사용).");

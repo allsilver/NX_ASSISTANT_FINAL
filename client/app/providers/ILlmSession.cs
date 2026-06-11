@@ -5,6 +5,17 @@
 
 namespace NxAssistant.Providers;
 
+public enum ChatEventKind { Status, Token, Done, Markdown }
+
+/// <summary>스트리밍 채팅 이벤트. Status=진행 멘트, Token=부분 답변(이어붙임), Markdown=완료 후 서식본, Done=완료.</summary>
+public readonly record struct ChatEvent(ChatEventKind Kind, string Text)
+{
+    public static ChatEvent Status(string text)   => new(ChatEventKind.Status, text);
+    public static ChatEvent Token(string text)    => new(ChatEventKind.Token, text);
+    public static ChatEvent Markdown(string text) => new(ChatEventKind.Markdown, text);
+    public static ChatEvent Done()                => new(ChatEventKind.Done, "");
+}
+
 public interface ILlmSession
 {
     /// <summary>현재 선택된 LLM 이름 ("Gauss" / "GPT")</summary>
@@ -16,8 +27,11 @@ public interface ILlmSession
     /// <summary>GPT 로그인 완료 여부</summary>
     Task<bool> IsGptReadyAsync();
 
-    /// <summary>현재 LLM 으로 질의 → 답변</summary>
+    /// <summary>현재 LLM 으로 질의 → 답변(한 번에)</summary>
     Task<string> AskAsync(string prompt, CancellationToken ct = default);
+
+    /// <summary>현재 LLM 으로 질의 → 스트리밍 이벤트(진행 멘트 → 부분 답변 → 완료)</summary>
+    IAsyncEnumerable<ChatEvent> AskStreamAsync(string question, CancellationToken ct = default);
 
     /// <summary>LLM 전환</summary>
     Task SetLlmAsync(string llm);

@@ -2,6 +2,7 @@
 // ILlmSession 을 구현하되 서버/WebView2 없이 가짜 답변만 돌려줌.
 // ChatView 가 이걸 주입받아 실제처럼 동작(답변만 mock).
 
+using System.Runtime.CompilerServices;
 using NxAssistant.Providers;
 
 namespace NxAssistant.UI;
@@ -19,6 +20,55 @@ internal sealed class MockLlmSession : ILlmSession
         return $"[mock · {Current}] \"{prompt}\" 에 대한 예시 답변입니다.\n" +
                "UI 프리뷰라 실제 서버/LLM 연결 없이 표시됩니다.\n" +
                "여러 줄·줄바꿈·말풍선 레이아웃을 확인하기 위한 더미 텍스트입니다.";
+    }
+
+    // 가짜 스트리밍: 진행 멘트 → 토큰 단위 출력 → 완료. (서버/GPT 없이 UI 검증용)
+    public async IAsyncEnumerable<ChatEvent> AskStreamAsync(string question, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        yield return ChatEvent.Status("질문을 이해하는 중");
+        await Task.Delay(700, ct);
+
+        yield return ChatEvent.Status(IsGpt ? "관련 자료를 검색하는 중" : "설계수순서 DB를 조회하는 중");
+        await Task.Delay(900, ct);
+
+        yield return ChatEvent.Status("답변을 작성하는 중");
+        await Task.Delay(500, ct);
+
+        var mdLines = new[]
+        {
+            "### [FH-012] 폴더블 힌지 표준",
+            "- 힌지 반복 내구는 **20만 회 이상**을 만족해야 한다.",
+            "- 토크 편차는 **±10%** 이내로 한다.",
+            "",
+            "간단한 코드 예시는 아래와 같습니다.",
+            "",
+            "```",
+            "for i in range(5):",
+            "    print(f\"Hello NX! {i}\")",
+            "```",
+            "",
+            "그 외 세부 기준은 `자료에 없음`입니다."
+        };
+        var acc = new System.Text.StringBuilder();
+        foreach (var ln in mdLines)
+        {
+            ct.ThrowIfCancellationRequested();
+            acc.Append(ln).Append('\n');
+            yield return ChatEvent.Token(acc.ToString());   // 누적 마크다운 스냅샷
+            await Task.Delay(180, ct);
+        }
+        yield return ChatEvent.Done();
+    }
+
+    private static IEnumerable<string> Tokenize(string s)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var ch in s)
+        {
+            sb.Append(ch);
+            if (ch is ' ' or '\n') { yield return sb.ToString(); sb.Clear(); }
+        }
+        if (sb.Length > 0) yield return sb.ToString();
     }
 
     public Task SetLlmAsync(string llm)

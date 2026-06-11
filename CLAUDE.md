@@ -190,6 +190,8 @@ OutOfMemory 시: `dotnet build-server shutdown` → `Get-Process dotnet|Stop-Pro
 | WEBVIEW2_LOADER_DLL | WebView2 Loader dll 경로 |
 | NX_ASSISTANT_DB_MCP_URL | DB 서버 주소 (기본 http://127.0.0.1:8766) |
 | DB_MCP_TOKEN | DB 서버 인증 토큰 |
+| NX_ASSISTANT_FAKE_DBPROMPT=1 | (테스트) 서버 없이 예시 RAG 프롬프트로 GPT 분기 검증. **실서버 테스트 시 끌 것** |
+| NX_ASSISTANT_SHOW_WORKER=1 | (디버그) GPT 워커 창을 띄워 관찰 (평소엔 화면 밖 parking) |
 
 ### 로그
 - 위치: `%LOCALAPPDATA%\NX_Assistant\logs\nx-assistant.log`

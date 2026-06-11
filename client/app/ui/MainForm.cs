@@ -185,6 +185,7 @@ public sealed class MainForm : Form
     {
         _session.SetDomain(_domain);    // /mech/ask 에 도메인 전달
         _session.SetDbKeys(_dbKeys);    // 선택한 db_keys 전달 (비어있으면 서버 전체 검색)
+        _session.DomainName = _domainName;   // 상태 멘트용 표시명 (예: "설계수순서 DB를 조회하는 중")
         var view = new ChatView(_domainName, _session,
             onBack: ShowDomainSelect,
             onHome: ShowFieldSelect,

@@ -4,6 +4,7 @@
 // - GPT는 WorkerForm(로그인) 생성/공유 → 도메인 바꿔도 로그인 1회
 // - 도메인 바꿔도 LLM 설정 유지 (앱 전역 1개)
 
+using System.Runtime.CompilerServices;
 using NxAssistant.Mcp;
 using NxAssistant.UI;
 
@@ -110,6 +111,38 @@ public sealed class LlmSession : ILlmSession, IDisposable
         }
         return await Provider.ChatAsync(prompt, ct);
     }
+
+    /// <summary>상태 멘트에 쓸 도메인 표시명 (예: "설계수순서"). MainForm 에서 주입.</summary>
+    public string DomainName { get; set; } = "";
+
+    /// <summary>현재 LLM 으로 질의 → 스트리밍 이벤트(진행 멘트 → 부분 답변 → 완료).</summary>
+    public async IAsyncEnumerable<ChatEvent> AskStreamAsync(string question, [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        if (IsGpt && _gptProvider != null)
+        {
+            // 1) 검색·프롬프트 조립(서버) — 이 await 동안 "조회 중"이 떠 있음(실제 검색 시간만큼)
+            yield return ChatEvent.Status(SearchStatusText());
+            var prompt = await _dbMcp.GetGptPromptAsync(question, _domain, _dbKeys, ct);
+            if (string.IsNullOrWhiteSpace(prompt)) prompt = question;
+
+            // 2) GPT 답변 생성 — 워커가 마크다운 스냅샷을 누적으로 yield → Token 으로 전달
+            yield return ChatEvent.Status("답변을 작성하는 중");
+            await foreach (var snapshot in _gptProvider.ChatStreamAsync(prompt, ct))
+                yield return ChatEvent.Token(snapshot);   // snapshot = 현재까지의 마크다운
+            yield return ChatEvent.Done();
+        }
+        else
+        {
+            // Gauss(1차): 한 번에. 답변이 markdown 이면 ChatView 가 서식 렌더. (SSE 스트리밍은 다음 단계)
+            yield return ChatEvent.Status(SearchStatusText());
+            var answer = await AskAsync(question, ct);
+            yield return ChatEvent.Token(answer);
+            yield return ChatEvent.Done();
+        }
+    }
+
+    private string SearchStatusText()
+        => string.IsNullOrEmpty(DomainName) ? "관련 자료를 검색하는 중" : $"{DomainName} DB를 조회하는 중";
 
     /// <summary>DB 도메인 키 설정. Gauss /mech/ask + GPT 프롬프트 요청에 실린다.</summary>
     public void SetDomain(string domain)
