@@ -1,0 +1,28 @@
+!
+! NX Design Assistant application menu.
+! Kept as a MenuBarManager-compatible fallback, but the visible entry point is
+! currently registered by startup\nx_assistant_button.men.
+!
+
+VERSION 120
+
+EDIT UG_GATEWAY_MAIN_MENUBAR
+
+TOP_MENU
+
+CASCADE_BUTTON NX_ASSISTANT_MENU
+LABEL NX Assistant
+
+END_OF_TOP_MENU
+
+MENU NX_ASSISTANT_MENU
+
+BUTTON NX_ASSISTANT_OPEN_BUTTON
+LABEL Open Assistant
+TOOLBAR_LABEL AI Assistant
+MESSAGE Opens the NX Design Assistant chat panel.
+HINT Opens the mechanical-team AI assistant.
+BITMAP nx_assistant_galaxy
+ACTIONS NX_ASSISTANT_OPEN_ACTION
+
+END_OF_MENU

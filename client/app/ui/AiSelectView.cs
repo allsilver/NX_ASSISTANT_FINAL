@@ -72,19 +72,9 @@ internal sealed class AiSelectView : Panel
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         var leftWrap = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
-        var leftBlock = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown, WrapContents = false, BackColor = Color.Transparent };
-        var logoIcon = new BrandLogo { Kind = logo, Size = new Size(60, 60), Anchor = AnchorStyles.None };
-        var nameLabel = new Label { Text = name, AutoSize = true, Font = new Font("Malgun Gothic", 13F, FontStyle.Bold), ForeColor = Palette.Text, Margin = new Padding(0, 8, 0, 0), Anchor = AnchorStyles.None };
-        var logoHolder = new Panel { Size = new Size(80, 60), BackColor = Color.Transparent };
-        logoIcon.Location = new Point((80-60)/2, 0);
-        logoHolder.Controls.Add(logoIcon);
-        leftBlock.Controls.Add(logoHolder); leftBlock.Controls.Add(nameLabel);
-        leftWrap.Controls.Add(leftBlock);
-        leftWrap.Resize += (_, _) =>
-        {
-            nameLabel.Margin = new Padding(Math.Max(0,(leftBlock.Width - nameLabel.Width)/2), 8, 0, 0);
-            leftBlock.Location = new Point((leftWrap.Width - leftBlock.Width)/2, (leftWrap.Height - leftBlock.Height)/2);
-        };
+        // 로고 PNG에 글자(Gauss/ChatGPT)가 포함돼 있어 별도 텍스트 라벨은 두지 않음.
+        var logoIcon = new BrandLogo { Kind = logo, Dock = DockStyle.Fill, Margin = new Padding(0) };
+        leftWrap.Controls.Add(logoIcon);
 
         var rightWrap = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
         var checks = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.TopDown, WrapContents = false, BackColor = Color.Transparent };

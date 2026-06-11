@@ -2,6 +2,7 @@
 // 공통 UI 키트: 색상 팔레트 + 재사용 컨트롤 모음 (1차 배포용, 추후 분리)
 
 using System.Drawing.Drawing2D;
+using System.Reflection;
 
 namespace NxAssistant.UI;
 
@@ -179,6 +180,9 @@ internal sealed class VectorIcon : Control
 internal sealed class BrandLogo : Control
 {
     public LogoKind Kind { get; set; }
+
+    private static readonly Dictionary<LogoKind, Image?> _cache = new();
+
     public BrandLogo()
     {
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer
@@ -186,26 +190,47 @@ internal sealed class BrandLogo : Control
                | ControlStyles.SupportsTransparentBackColor, true);
         BackColor = Color.Transparent;
     }
+
+    // 임베디드 리소스에서 로고 PNG 로드 (네임스페이스 무관하게 파일명으로 탐색, 캐시).
+    private static Image? GetLogo(LogoKind kind)
+    {
+        if (_cache.TryGetValue(kind, out var cached)) return cached;
+        var file = kind == LogoKind.Gauss ? "gauss_logo.png" : "chatgpt_logo.png";
+        Image? img = null;
+        try
+        {
+            var asm  = typeof(BrandLogo).Assembly;
+            var name = asm.GetManifestResourceNames()
+                          .FirstOrDefault(n => n.EndsWith(file, StringComparison.OrdinalIgnoreCase));
+            if (name != null)
+            {
+                using var s = asm.GetManifestResourceStream(name);
+                if (s != null) img = Image.FromStream(s);
+            }
+        }
+        catch { /* 리소스 없으면 null → 빈 영역 (앱 동작엔 지장 없음) */ }
+        _cache[kind] = img;
+        return img;
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
-        var g = e.Graphics; g.SmoothingMode = SmoothingMode.AntiAlias;
-        int d = Math.Min(Width, Height); if (d > 60) d = 60;
-        int cx = Width/2, cy = Height/2;
-        var circle = new Rectangle(cx-d/2, cy-d/2, d, d);
-        if (Kind == LogoKind.Gauss)
-        {
-            using var fill = new SolidBrush(Palette.Accent); g.FillEllipse(fill, circle);
-            using var font = new Font("Segoe UI", d*0.42f, FontStyle.Bold);
-            var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-            g.DrawString("G", font, Brushes.White, circle, sf);
-        }
-        else
-        {
-            using var fill = new SolidBrush(Palette.GptGreen); g.FillEllipse(fill, circle);
-            using var pen = new Pen(Color.White, Math.Max(2f, d*0.06f)){ StartCap=LineCap.Round, EndCap=LineCap.Round };
-            float r = d*0.26f;
-            for (int i=0;i<6;i++){ double a=Math.PI/3*i; g.DrawLine(pen, cx, cy, cx+(float)(r*Math.Cos(a)), cy+(float)(r*Math.Sin(a))); }
-        }
+        var img = GetLogo(Kind);
+        if (img == null) return;
+
+        var g = e.Graphics;
+        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+        g.PixelOffsetMode   = PixelOffsetMode.HighQuality;
+
+        int pad = 8;
+        int aw = Width - 2 * pad, ah = Height - 2 * pad;
+        if (aw <= 0 || ah <= 0) return;
+        double scale = Math.Min(aw / (double)img.Width, ah / (double)img.Height);
+        int w = (int)Math.Round(img.Width  * scale);
+        int h = (int)Math.Round(img.Height * scale);
+        int x = pad + (aw - w) / 2;
+        int y = pad + (ah - h) / 2;
+        g.DrawImage(img, x, y, w, h);
     }
 }
 

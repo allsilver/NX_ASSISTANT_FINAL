@@ -31,4 +31,10 @@
     <Compile Include="..\app\config\DbKeySelectionStore.cs" Link="shared\DbKeySelectionStore.cs" />
   </ItemGroup>
 
+  <!-- 로고 PNG (BrandLogo가 임베디드 리소스로 로드 — 앱과 동일 파일) -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\app\ui\assets\gauss_logo.png"   Link="assets\gauss_logo.png" />
+    <EmbeddedResource Include="..\app\ui\assets\chatgpt_logo.png" Link="assets\chatgpt_logo.png" />
+  </ItemGroup>
+
 </Project>

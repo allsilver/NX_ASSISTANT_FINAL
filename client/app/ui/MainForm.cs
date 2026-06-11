@@ -22,7 +22,8 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text          = "Gauss AI";
+        Text          = "NX Assistant";
+        Icon          = AppIcon.Load();   // exe에 박힌 NX 아이콘 → 제목줄/작업표시줄 표시
         StartPosition = FormStartPosition.CenterScreen;
         Size          = new Size(620, 1000);
         MinimumSize   = new Size(460, 720);

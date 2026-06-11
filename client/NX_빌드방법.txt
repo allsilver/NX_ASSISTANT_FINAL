@@ -1,0 +1,9 @@
+# 1) 로컬로 코드 옮기고 빌드
+cd ...\client\app
+Remove-Item -Recurse -Force bin, obj -EA SilentlyContinue
+dotnet build -t:Rebuild -p:UseSharedCompilation=false -m:1 --disable-build-servers
+
+# 2) 방금 빌드한 exe를 런처가 보도록 환경변수 지정 (전체 경로로)
+setx NX_ASSISTANT_EXE "C:\...\client\app\bin\Debug\net8.0-windows\NxAssistant.exe"
+
+# 3) NX 재시작 (환경변수는 프로세스 시작 때 읽힘 → 꼭 재시작)

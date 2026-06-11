@@ -8,6 +8,7 @@
     <PlatformTarget>x64</PlatformTarget>
     <AssemblyName>NxAssistant</AssemblyName>
     <RootNamespace>NxAssistant</RootNamespace>
+    <ApplicationIcon>assets\nx_assistant.ico</ApplicationIcon>
 
     <WebView2CoreDll>$(WEBVIEW2_CORE_DLL)</WebView2CoreDll>
     <WebView2WinFormsDll>$(WEBVIEW2_WINFORMS_DLL)</WebView2WinFormsDll>
@@ -45,5 +46,10 @@
   <!-- 로컬 PC: NuGet 패키지 (Core/WinForms/Loader 모두 포함) -->
   <ItemGroup Condition="'$(UseWebView2Nuget)' == 'true'">
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2592.51" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ui\assets\gauss_logo.png" />
+    <EmbeddedResource Include="ui\assets\chatgpt_logo.png" />
   </ItemGroup>
 </Project>

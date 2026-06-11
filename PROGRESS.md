@@ -7,6 +7,20 @@
 
 ## 🟡 진행 중 / 백로그
 
+### NX 연동 + 브랜딩 (2026-06-11 완료, 시연 가능 상태)
+- [x] **Gauss/GPT 카드 로고 교체**: 실제 로고 PNG(흰배경 제거·트림) 임베드, `BrandLogo`가 비율맞춤 렌더, 카드 기존 텍스트 라벨 제거(글자는 이미지에 포함). 앱+프리뷰 csproj 둘 다 EmbeddedResource.
+- [x] **작업표시줄/제목줄 아이콘**: 코덱스 최종 승인본 `nx-assistant-...-v3-taskbar-fit.ico`(NX+별)를 `client/app/assets/nx_assistant.ico`로 가져와 `<ApplicationIcon>` 연결 + `MainForm.Icon = AppIcon.Load()`. (재정리하며 누락됐던 것 복구)
+- [x] **창 제목 "NX Assistant"** 로 변경 (코덱스 원래대로 + 런처 BringExistingWindow 가 찾는 제목과 일치).
+- [x] **NX 커스터마이제이션 파일 repo 반입**: startup(.rtb/.grb/.men/galaxy.bmp/README), bitmaps, application/.men — 코덱스 원본 그대로(기존엔 .men 하나뿐).
+- [x] **NX 버튼 → 우리 앱 실행 연결 (로컬 검증 완료)**: HEROS "AI Assistant" → 현재 빌드 앱이 뜸.
+  - 핵심: 설치된 런처(코덱스 experiments 스파이크 런처)는 `NX_ASSISTANT_WEBVIEW2_EXE` 환경변수를 읽음(`NX_ASSISTANT_EXE` 아님!). 이 변수에 우리 exe 전체경로 지정 → 버튼이 우리 앱 실행. (환경변수 상속 위해 로그오프/재로그인 필요)
+- [x] **GPT 경로 401 해결 (로컬)**: 클라 `DB_MCP_TOKEN`(Bearer) = 서버 유효토큰(`settings.json.db_mcp_token` 우선) 일치 + NX-실행 앱이 토큰 상속받도록. 인증은 Gauss/GPT 공통(서버 `_auth`).
+
+### 정리 필요 (시연 후) — "지저분한 것" 정돈
+- [ ] **NX 연동 깔끔하게 재설치**: 현재는 코덱스 experiments **스파이크 런처**가 `NX_ASSISTANT_WEBVIEW2_EXE`로 우리 exe를 띄우는 **임시 연결**. → 우리 전용 런처(`client/nx-launcher`, NxAssistant.exe를 직접 실행)로 빌드·재설치해 스파이크 의존 제거.
+- [ ] 임시 환경변수 정리: 잘못 설정했던 `NX_ASSISTANT_EXE` 제거, 연결 변수는 런처 재설치 후 정식 경로(publish)로 전환 검토.
+- [ ] 데모는 Debug 빌드 + 환경변수로 띄움 → 정식 배포 시 `publish/win-x64`(자체포함) 경로로 정리.
+
 ### 스트리밍 채팅 UX (V2.4 완료, 2026-06-11)
 - [x] 스트리밍 이벤트 인터페이스(ChatEvent: Status/Token/Done) + ChatView 소비
 - [x] GPT 점진 스트리밍 인프라(워커 폴링) + 단계 멘트(실제 await에 묶음) + 최소표시시간
@@ -228,7 +242,7 @@ MEG_ChatBot_claude의 `_find_image_paths` 로직을 이식.
 - [ ] 설정 페이지: GPT 로그아웃 / 재로그인 버튼
 - [ ] 설정 페이지 동작 자연스럽게 다듬기 (다우니 요청): "관심분야 재설정"·"외부 AI 재로그인"의 진입/복귀 흐름 매끄럽게.
       현재 외부 AI 재로그인 = AI 선택 화면 재진입(임시). GPT 세션만 조용히 재로그인하는 방식 등 검토.
-- [ ] 실제 Gauss/GPT 로고 이미지 교체 (현재 임시 직접그림)
+- [x] 실제 Gauss/GPT 로고 이미지 교체 (2026-06-11 완료: PNG 임베드 + BrandLogo 렌더)
 - [ ] UI 파일 분리 리팩토링 (UiKit/MainForm을 기능별로)
 
 ### 2차 배포 (1000명)

@@ -96,8 +96,17 @@ NX_ASSISTANT_FINAL/
 │   ├── history/HistoryManager.cs    ← 대화 히스토리
 │   ├── config/DbKeySelectionStore.cs← 도메인별 선택 db_key 로컬 저장 (%LOCALAPPDATA%\NX_Assistant\db_selection.json)
 │   ├── router/RouterClient.cs       ← (1차 배포 미사용, 2차 라우터용 보존)
-│   ├── Program.cs                   ← MainForm 실행
+│   ├── Program.cs                   ← MainForm 실행 (AppIcon.Load = exe 아이콘 추출)
+│   ├── ui/assets/                   ← 카드 로고 PNG (gauss_logo/chatgpt_logo, EmbeddedResource)
+│   ├── assets/                      ← nx_assistant.ico(작업표시줄/제목줄, <ApplicationIcon>), galaxy_ai_logo.png(NX버튼 소스 참고)
 │   └── NxAssistant.csproj
+│
+├── client/nx-customization/        ← NX 시작 시 로드되는 커스터마이제이션 (코덱스 원본)
+│   ├── startup/                    ← .rtb(리본 탭) → .grb(그룹) → .men(버튼) + nx_assistant_galaxy.bmp + README
+│   ├── bitmaps/                    ← ai_sparkle.bmp, nx_assistant_galaxy.bmp
+│   └── application/nx_assistant.men ← 메뉴앱 fallback 정의
+│
+├── client/nx-launcher/             ← NX 버튼 → 앱 실행 런처 소스 (우리 전용, 정식 재설치는 시연 후 TODO)
 │
 ├── client/ui-preview/              ← UI 프리뷰 (개발 전용, 서버/WebView2 없음)
 │   ├── UiPreview.csproj            ← app/ 의 순수 UI 파일을 링크해 컴파일
@@ -190,13 +199,20 @@ OutOfMemory 시: `dotnet build-server shutdown` → `Get-Process dotnet|Stop-Pro
 | WEBVIEW2_WINFORMS_DLL | WebView2 WinForms dll 경로 |
 | WEBVIEW2_LOADER_DLL | WebView2 Loader dll 경로 |
 | NX_ASSISTANT_DB_MCP_URL | DB 서버 주소 (기본 http://127.0.0.1:8766) |
-| DB_MCP_TOKEN | DB 서버 인증 토큰 |
+| DB_MCP_TOKEN | DB 서버 인증 토큰 (Bearer). **서버 유효토큰 = settings.json.db_mcp_token 우선**. 불일치 시 401. |
+| NX_ASSISTANT_WEBVIEW2_EXE | **NX 버튼이 띄울 앱 exe 전체경로.** 설치된 코덱스 스파이크 런처가 읽는 변수(≠ `NX_ASSISTANT_EXE`). 데모용 현재 빌드 연결에 사용. |
 | NX_ASSISTANT_FAKE_DBPROMPT=1 | (테스트) 서버 없이 예시 RAG 프롬프트로 GPT 분기 검증. **실서버 테스트 시 끌 것** |
 | NX_ASSISTANT_SHOW_WORKER=1 | (디버그) GPT 워커 창을 띄워 관찰 (평소엔 화면 밖 parking) |
 
-### 로그
-- 위치: `%LOCALAPPDATA%\NX_Assistant\logs\nx-assistant.log`
-- 읽기(한글): `Get-Content ... -Encoding UTF8`
+### NX 버튼 → 앱 실행 (현재 = 임시 연결, 시연용)
+- 설치된 런처는 코덱스 **experiments 스파이크 런처**. exe 경로를 `NX_ASSISTANT_WEBVIEW2_EXE`(있으면) → 없으면 하드코딩된 스파이크 publish 경로 순으로 잡음.
+- 그래서 우리 앱 연결 = `setx NX_ASSISTANT_WEBVIEW2_EXE "<...>\bin\Debug\net8.0-windows\NxAssistant.exe"`.
+- **환경변수 상속 주의**: NX는 시작 시점 환경을 상속 → 변수 바꾸면 **로그오프/재로그인**(또는 explorer 재시작) 후 NX 실행해야 반영됨. (DB_MCP_TOKEN도 동일)
+- 정식화(시연 후): `client/nx-launcher` 우리 런처로 빌드·재설치 → NxAssistant.exe 직접 실행, 스파이크 의존 제거.
+
+### 로그 (2종, 위치 다름)
+- **앱 로그**: `%LOCALAPPDATA%\NX_Assistant\logs\nx-assistant.log` (앱 동작/오류)
+- **런처 로그**: `<프로젝트루트>\logs\nx-launcher.log` (NX가 **어떤 exe를 띄웠는지** — `Started WebView2 Assistant: <경로>`)
 
 ---
 
