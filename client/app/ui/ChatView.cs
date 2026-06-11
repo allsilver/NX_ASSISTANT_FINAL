@@ -4,6 +4,8 @@
 //   (토큰 단위 X. 문단/줄 단위로 서식 포함 점진 출력)
 
 using NxAssistant.Providers;
+using NxAssistant.Mcp;
+using System.IO;
 
 namespace NxAssistant.UI;
 
@@ -12,6 +14,8 @@ internal sealed class ChatView : Panel
     private FlowLayoutPanel _messages = null!;
     private TextBox         _input = null!;
     private Panel           _composerHost = null!;
+    private WheelFilter?    _wheelFilter;
+    private Panel?          _bottomSpacer;   // 목록 맨 아래 스크롤 가능한 여백 (FlowLayoutPanel은 bottom padding이 스크롤에 안 잡힘)
     private PillButton      _llmToggle = null!;
     private readonly ILlmSession _session;
     private readonly string _domainName;
@@ -23,6 +27,7 @@ internal sealed class ChatView : Panel
     private static readonly Font BoldFont = new Font("Malgun Gothic", 9F, FontStyle.Bold);
     private static readonly Font HeadFont = new Font("Malgun Gothic", 10.5F, FontStyle.Bold);
     private static readonly Font MonoFont = new Font("Consolas", 9F);
+    private static readonly Font CaptionFont = new Font("Malgun Gothic", 8F);
 
     public ChatView(string domainName, ILlmSession session, Action onBack, Action onHome, Action onSettings)
     {
@@ -137,6 +142,7 @@ internal sealed class ChatView : Panel
 
         bool   hasAnswer = false;
         string lastMd = "";
+        IReadOnlyList<RagImage>? lastImages = null;
 
         try
         {
@@ -150,6 +156,9 @@ internal sealed class ChatView : Panel
                     case ChatEventKind.Token:
                         hasAnswer = true;
                         lastMd = ev.Text;       // 최종 마크다운 보관 (완료 후 한 번에 서식 렌더)
+                        break;
+                    case ChatEventKind.Images:
+                        lastImages = ev.Pics;   // 검색된 표준 이미지 (답변 아래 표시)
                         break;
                     case ChatEventKind.Done:
                         break;
@@ -165,6 +174,8 @@ internal sealed class ChatView : Panel
             {
                 var rtb = BeginAiRichText(aiRow);
                 await RenderMarkdownAnimated(rtb, lastMd);   // 문단 단위 서식 페이드인
+                if (lastImages is { Count: > 0 })
+                    AddImages(lastImages);                   // 답변 ↔ 액션바 사이에 이미지
                 AddActionBar(aiRow, rtb.Text);
             }
         }
@@ -213,7 +224,7 @@ internal sealed class ChatView : Panel
         var row = new Panel { AutoSize = false, Margin = new Padding(0, 0, 0, 18), BackColor = Color.Transparent };
         var label = new Label { Text = text, AutoSize = true, Font = MsgFont, ForeColor = Palette.Text, BackColor = Color.Transparent, MaximumSize = new Size(10, 0) };
         row.Controls.Add(label); row.Tag = ("ai", label);
-        _messages.Controls.Add(row); LayoutRow(row); ScrollToBottom();
+        AppendBeforeSpacer(row); LayoutRow(row); ScrollToBottom();
         return row;
     }
 
@@ -387,7 +398,7 @@ internal sealed class ChatView : Panel
     private void AddActionBar(Panel aiRow, string fullText)
     {
         var crlf = ToCrlf(fullText);
-        var row  = new Panel { AutoSize = false, Margin = new Padding(0, 0, 0, 16), BackColor = Color.Transparent };
+        var row  = new Panel { AutoSize = false, Margin = new Padding(0, 0, 0, 36), BackColor = Color.Transparent };
         var flow = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, FlowDirection = FlowDirection.LeftToRight, WrapContents = false, BackColor = Color.Transparent };
         var tip  = new ToolTip();
 
@@ -415,9 +426,7 @@ internal sealed class ChatView : Panel
         row.Controls.Add(flow);
         row.Tag = ("actions", flow);
 
-        int idx = _messages.Controls.GetChildIndex(aiRow);
-        _messages.Controls.Add(row);
-        _messages.Controls.SetChildIndex(row, idx + 1);
+        AppendBeforeSpacer(row);   // 답변(+이미지) 다음, 맨 끝에 추가
 
         flow.PerformLayout();
         row.Height = flow.Height + 8;
@@ -471,7 +480,71 @@ internal sealed class ChatView : Panel
             Cursor = Cursors.IBeam, HideSelection = false
         };
         bubble.Controls.Add(tb); row.Controls.Add(bubble); row.Tag = ("user", bubble, tb);
-        _messages.Controls.Add(row); LayoutRow(row); ScrollToBottom();
+        AppendBeforeSpacer(row); LayoutRow(row); ScrollToBottom();
+    }
+
+    // ── 검색된 표준 이미지 (답변 아래) ──────────────────────────────
+    private void AddImages(IReadOnlyList<RagImage> images)
+    {
+        foreach (var img in images)
+        {
+            Image bmp;
+            try
+            {
+                using var ms  = new MemoryStream(img.Data);
+                using var tmp = Image.FromStream(ms);
+                bmp = new Bitmap(tmp);   // 픽셀 복사 → 스트림 닫혀도 안전
+            }
+            catch { continue; }
+
+            var row = new Panel { AutoSize = false, Margin = new Padding(0, 0, 0, 14), BackColor = Color.Transparent };
+            var pic = new PictureBox { SizeMode = PictureBoxSizeMode.Zoom, Image = bmp, BackColor = Palette.Surface, Margin = new Padding(0), Cursor = Cursors.Hand };
+            var cap = new Label { Text = CaptionText(img), AutoSize = true, Font = CaptionFont, ForeColor = Palette.Muted, BackColor = Color.Transparent };
+
+            var full  = bmp;                     // 클릭 시 확대할 원본 (썸네일과 공유)
+            var title = StripExt(img.Name);
+            pic.Click += (_, _) => ShowImagePopup(full, title);
+
+            row.Controls.Add(pic); row.Controls.Add(cap);
+            row.Tag = ("image", pic, cap, bmp.Size);
+
+            AppendBeforeSpacer(row);
+            LayoutRow(row);
+        }
+        ScrollToBottom();
+    }
+
+    private static string CaptionText(RagImage img)
+        => img.ScorePct is int p ? $"(관련성 {p}%)  {StripExt(img.Name)}" : StripExt(img.Name);
+
+    // 이미지 클릭 → 큰 팝업으로 확대 (클릭/Esc 닫기)
+    private void ShowImagePopup(Image img, string title)
+    {
+        var screen   = Screen.FromControl(this).WorkingArea;
+        int maxW     = (int)(screen.Width * 0.9), maxH = (int)(screen.Height * 0.9);
+        double scale = Math.Min(1.0, Math.Min(maxW / (double)img.Width, maxH / (double)img.Height));
+        int cw = Math.Max(360, (int)(img.Width  * scale));
+        int ch = Math.Max(260, (int)(img.Height * scale));
+
+        var f = new Form
+        {
+            Text = title, StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.Sizable, ShowInTaskbar = false,
+            ClientSize = new Size(cw, ch), BackColor = Color.FromArgb(32, 34, 38),
+            KeyPreview = true,
+        };
+        var pb = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, Image = img, BackColor = Color.FromArgb(32, 34, 38), Cursor = Cursors.Hand };
+        pb.Click  += (_, _) => f.Close();
+        f.KeyDown += (_, e) => { if (e.KeyCode == Keys.Escape) f.Close(); };
+        f.Controls.Add(pb);
+        f.Show(FindForm());   // 모달리스: 팝업 띄운 채 채팅 사용 가능 + 여러 창 동시 가능
+        // img(썸네일과 공유)는 dispose 하지 않음 — Form/PictureBox dispose 시 Image 는 보존됨.
+    }
+
+    private static string StripExt(string name)
+    {
+        var i = name.LastIndexOf('.');
+        return i > 0 ? name[..i] : name;
     }
 
     // ── 레이아웃 ────────────────────────────────────────────────────
@@ -514,6 +587,19 @@ internal sealed class ChatView : Panel
             bubble.Size = new Size(bw, bh);
             bubble.Location = new Point(rowWidth - bw, 0); row.Height = bh;
         }
+        else if (row.Tag is ValueTuple<string, PictureBox, Label, Size> im && im.Item1 == "image")
+        {
+            var (_, pic, cap, natural) = im;
+            int natW = natural.Width  <= 0 ? rowWidth : natural.Width;
+            int natH = natural.Height <= 0 ? 1        : natural.Height;
+            int targetW = Math.Min(rowWidth, natW);
+            int targetH = (int)Math.Round(natH * (targetW / (double)natW));
+            pic.Location    = new Point(0, 0);
+            pic.Size        = new Size(targetW, targetH);
+            cap.MaximumSize = new Size(rowWidth - 4, 0);
+            cap.Location    = new Point(2, targetH + 4);
+            row.Height      = targetH + 4 + cap.Height + 2;
+        }
         // "actions" 행은 높이 고정(AddActionBar) — 폭만 위에서 맞춤
     }
 
@@ -521,10 +607,72 @@ internal sealed class ChatView : Panel
 
     private void ScrollToBottom()
     {
+        EnsureSpacerLast();
         if (_messages.Controls.Count == 0) return;
         _messages.PerformLayout();
         var last = _messages.Controls[_messages.Controls.Count - 1];
         _messages.ScrollControlIntoView(last);
         _messages.AutoScrollPosition = new Point(0, _messages.DisplayRectangle.Height);
+    }
+
+    // 새 행은 항상 바닥 스페이서 "앞"에 들어가게 (스페이서는 늘 마지막 유지)
+    private void AppendBeforeSpacer(Control row)
+    {
+        _messages.Controls.Add(row);
+        if (_bottomSpacer != null && _messages.Controls.Contains(_bottomSpacer))
+            _messages.Controls.SetChildIndex(_bottomSpacer, _messages.Controls.Count - 1);
+    }
+
+    // 목록 맨 아래에 항상 ~2줄 스크롤 가능한 여백을 둠 (status 멘트/마지막 답변이 컴포저에 붙지 않게)
+    private void EnsureSpacerLast()
+    {
+        _bottomSpacer ??= new Panel { Height = 40, Margin = new Padding(0), BackColor = Color.Transparent, Tag = "spacer" };
+        if (!_messages.Controls.Contains(_bottomSpacer)) _messages.Controls.Add(_bottomSpacer);
+        _messages.Controls.SetChildIndex(_bottomSpacer, _messages.Controls.Count - 1);
+        _bottomSpacer.Width = RowWidth();
+    }
+
+    // ── 마우스 휠: 자식(답변 RichTextBox / 이미지 PictureBox) 위에서도 목록이 스크롤되게 ──
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        _wheelFilter ??= new WheelFilter(this);
+        Application.RemoveMessageFilter(_wheelFilter);   // 중복 방지
+        Application.AddMessageFilter(_wheelFilter);
+    }
+
+    protected override void OnHandleDestroyed(EventArgs e)
+    {
+        if (_wheelFilter != null) Application.RemoveMessageFilter(_wheelFilter);
+        base.OnHandleDestroyed(e);
+    }
+
+    private void ScrollMessagesByWheel(int delta)
+    {
+        if (_messages == null) return;
+        int cur = -_messages.AutoScrollPosition.Y;
+        _messages.AutoScrollPosition = new Point(0, Math.Max(0, cur - delta));   // 상한은 패널이 자동 클램프 → 진짜 바닥까지
+    }
+
+    // 커서가 메시지 목록 위면, 자식이 휠을 가로채기 전에 목록을 스크롤
+    private sealed class WheelFilter : IMessageFilter
+    {
+        private readonly ChatView _view;
+        public WheelFilter(ChatView view) => _view = view;
+
+        public bool PreFilterMessage(ref Message m)
+        {
+            const int WM_MOUSEWHEEL = 0x020A;
+            if (m.Msg != WM_MOUSEWHEEL) return false;
+            var panel = _view._messages;
+            if (panel == null || !panel.IsHandleCreated || !_view.Visible) return false;
+
+            var rect = panel.RectangleToScreen(panel.ClientRectangle);
+            if (!rect.Contains(Control.MousePosition)) return false;
+
+            int delta = (short)(((long)m.WParam >> 16) & 0xFFFF);
+            _view.ScrollMessagesByWheel(delta);
+            return true;   // 자식(RichTextBox/PictureBox)이 못 가로채게 우리가 처리
+        }
     }
 }

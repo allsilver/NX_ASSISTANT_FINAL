@@ -3,7 +3,9 @@
 // ChatView 가 이걸 주입받아 실제처럼 동작(답변만 mock).
 
 using System.Runtime.CompilerServices;
+using System.IO;
 using NxAssistant.Providers;
+using NxAssistant.Mcp;
 
 namespace NxAssistant.UI;
 
@@ -57,7 +59,36 @@ internal sealed class MockLlmSession : ILlmSession
             yield return ChatEvent.Token(acc.ToString());   // 누적 마크다운 스냅샷
             await Task.Delay(180, ct);
         }
+
+        // 검색 이미지 렌더 확인용 (프리뷰 — 서버 없이 가짜 PNG 2장)
+        yield return ChatEvent.ImageList(new[]
+        {
+            MakeMockImage("foldable Damper Front Damper Front 설계 Flip.png", 100),
+            MakeMockImage("foldable Dust Cover Dust Cover 설계가이드.png",     62),
+        });
         yield return ChatEvent.Done();
+    }
+
+    private static RagImage MakeMockImage(string name, int pct)
+    {
+        using var bmp = new System.Drawing.Bitmap(720, 380);
+        using (var g = System.Drawing.Graphics.FromImage(bmp))
+        {
+            g.Clear(System.Drawing.Color.FromArgb(245, 247, 250));
+            using var pen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(180, 190, 205), 2);
+            g.DrawRectangle(pen, 8, 8, 703, 363);
+            using var f  = new System.Drawing.Font("Malgun Gothic", 18F, System.Drawing.FontStyle.Bold);
+            using var br = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(90, 100, 120));
+            var sf = new System.Drawing.StringFormat
+            {
+                Alignment     = System.Drawing.StringAlignment.Center,
+                LineAlignment = System.Drawing.StringAlignment.Center,
+            };
+            g.DrawString("MOCK 표준 이미지 (프리뷰)", f, br, new System.Drawing.RectangleF(0, 0, 720, 380), sf);
+        }
+        using var ms = new MemoryStream();
+        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+        return new RagImage(name, pct, ms.ToArray());
     }
 
     private static IEnumerable<string> Tokenize(string s)

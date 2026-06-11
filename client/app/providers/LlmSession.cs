@@ -105,7 +105,7 @@ public sealed class LlmSession : ILlmSession, IDisposable
     {
         if (IsGpt)
         {
-            var composed = await _dbMcp.GetGptPromptAsync(prompt, _domain, _dbKeys, ct);
+            var (composed, _) = await _dbMcp.GetGptPromptAsync(prompt, _domain, _dbKeys, ct);
             if (string.IsNullOrWhiteSpace(composed)) composed = prompt;   // 안전장치(서버 빈 응답 시 원문)
             return await Provider.ChatAsync(composed, ct);
         }
@@ -122,13 +122,17 @@ public sealed class LlmSession : ILlmSession, IDisposable
         {
             // 1) 검색·프롬프트 조립(서버) — 이 await 동안 "조회 중"이 떠 있음(실제 검색 시간만큼)
             yield return ChatEvent.Status(SearchStatusText());
-            var prompt = await _dbMcp.GetGptPromptAsync(question, _domain, _dbKeys, ct);
+            var (prompt, images) = await _dbMcp.GetGptPromptAsync(question, _domain, _dbKeys, ct);
             if (string.IsNullOrWhiteSpace(prompt)) prompt = question;
 
             // 2) GPT 답변 생성 — 워커가 마크다운 스냅샷을 누적으로 yield → Token 으로 전달
             yield return ChatEvent.Status("답변을 작성하는 중");
             await foreach (var snapshot in _gptProvider.ChatStreamAsync(prompt, ct))
                 yield return ChatEvent.Token(snapshot);   // snapshot = 현재까지의 마크다운
+
+            // 3) 검색된 표준 이미지 (있으면 답변 아래 표시)
+            if (images is { Count: > 0 })
+                yield return ChatEvent.ImageList(images);
             yield return ChatEvent.Done();
         }
         else
@@ -137,6 +141,10 @@ public sealed class LlmSession : ILlmSession, IDisposable
             yield return ChatEvent.Status(SearchStatusText());
             var answer = await AskAsync(question, ct);
             yield return ChatEvent.Token(answer);
+
+            var gimages = _gaussProvider?.LastImages;
+            if (gimages is { Count: > 0 })
+                yield return ChatEvent.ImageList(gimages);
             yield return ChatEvent.Done();
         }
     }

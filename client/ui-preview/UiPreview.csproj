@@ -27,6 +27,7 @@
     <Compile Include="..\app\ui\SettingsView.cs"     Link="shared\SettingsView.cs" />
     <Compile Include="..\app\providers\ILlmSession.cs" Link="shared\ILlmSession.cs" />
     <Compile Include="..\app\mcp\DbKeyOption.cs"     Link="shared\DbKeyOption.cs" />
+    <Compile Include="..\app\mcp\RagImage.cs"        Link="shared\RagImage.cs" />
     <Compile Include="..\app\config\DbKeySelectionStore.cs" Link="shared\DbKeySelectionStore.cs" />
   </ItemGroup>
 

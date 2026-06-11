@@ -26,6 +26,7 @@ SECTION_SCORE_THRESHOLD = 0.3
 
 _SRC_DIR      = Path(__file__).parent
 _PROJECT_ROOT = _SRC_DIR.parent  # server/
+DATA_ROOT     = _PROJECT_ROOT / "data"   # server/data/
 
 RERANKER_MODEL_PATH = _PROJECT_ROOT / "models" / "bge-reranker-v2-m3"
 _reranker = None
@@ -197,6 +198,65 @@ def _load_prompt_template(prompt_file: str) -> str:
     return prompt_path.read_text(encoding="utf-8")
 
 
+# ── 이미지 경로 탐색 (MEG_ChatBot_claude _find_image_paths 이식) ───
+#   파일명 규칙: "{db_key} {full_path 마지막 2개 세그먼트}.png"
+#   예) db_key=foldable, full_path="Damper 부 설계 > Damper Front > Damper Front 설계 Flip"
+#       → "foldable Damper Front Damper Front 설계 Flip.png"
+#   리랭크 점수를 min-max 정규화해 관련성 %(score_pct) 부여, % 내림차순 정렬.
+def _image_base_dir(domain_key: str) -> Path:
+    return DATA_ROOT / domain_key / "image"
+
+
+def _find_image_paths(scored_docs: list, image_base_dir: Path) -> list:
+    """(score, doc) 리스트 → [{path, name, score_pct}] (관련성 순). 파일 없으면 스킵."""
+    if not scored_docs:
+        return []
+
+    all_scores = [score for score, _ in scored_docs]
+    use_score  = any(s != 0.0 for s in all_scores)
+    min_s = min(all_scores) if use_score else 0.0
+    max_s = max(all_scores) if use_score else 0.0
+
+    def to_pct(score: float):
+        if max_s == min_s:
+            return 100
+        return round((score - min_s) / (max_s - min_s) * 100)
+
+    results: list = []
+    seen:    set  = set()
+
+    for score, doc in scored_docs:
+        meta      = doc.metadata or {}
+        db_key    = str(meta.get("db_key", "")).strip()
+        full_path = str(meta.get("full_path", "")).strip()
+        if not db_key or not full_path:
+            continue
+
+        segments = [s.strip() for s in full_path.split(">") if s.strip()]
+        if not segments:
+            continue
+        last_two  = " ".join(segments[-2:]) if len(segments) >= 2 else segments[0]
+        file_stem = f"{db_key} {last_two}"
+
+        if file_stem in seen:
+            continue
+        seen.add(file_stem)
+
+        candidate = image_base_dir / f"{file_stem}.png"
+        if candidate.exists():
+            results.append({
+                "path":      str(candidate),
+                "name":      candidate.name,
+                "score_pct": to_pct(score) if use_score else None,
+            })
+
+    results.sort(
+        key=lambda x: x["score_pct"] if x["score_pct"] is not None else -1,
+        reverse=True,
+    )
+    return results
+
+
 # ── SearchClient ─────────────────────────────────────────────────
 class SearchClient:
     def __init__(self, retriever_fn, vector_dbs: dict, use_reranker: bool = True):
@@ -228,6 +288,7 @@ def setup_design_bot(
     use_think:      bool = False,
     model_override: str  = None,
     exp_config:     dict = None,
+    domain_key:     str  = "",
 ):
     """
     RAG 핸들러 반환.
@@ -283,9 +344,11 @@ def setup_design_bot(
             print(f"⚠️  Case {case_str} 체인 로드 실패: {e}")
 
     search_client = SearchClient(retriever, vector_dbs, use_reranker)
-    print(f"✅ RAG 봇 초기화 완료 (model={model_name}, reranker={use_reranker})")
+    image_base_dir = _image_base_dir(domain_key)   # server/data/<domain_key>/image
+    print(f"✅ RAG 봇 초기화 완료 (model={model_name}, reranker={use_reranker}, image_dir={image_base_dir})")
 
-    def rag_handler(query: str, chat_history: list = None, case: int = 1, synonym_hint: str = "", compose_only: bool = False) -> str:
+    def rag_handler(query: str, chat_history: list = None, case: int = 1, synonym_hint: str = "", compose_only: bool = False):
+        """반환: (답변_또는_프롬프트 문자열, images[{path,name,score_pct}])"""
         raw_docs = search_client._retriever(query)
         if use_reranker:
             scored_docs = _rerank_docs(raw_docs, query)
@@ -298,7 +361,10 @@ def setup_design_bot(
             pure_docs = [d for _, d in scored_docs]
 
         if not pure_docs:
-            return "관련 표준을 찾지 못했습니다. 질문을 다시 입력해주세요."
+            return "관련 표준을 찾지 못했습니다. 질문을 다시 입력해주세요.", []
+
+        # 이미지: 리랭크된 scored_docs 기준 (점수 → 관련성 %)
+        images = _find_image_paths(scored_docs, image_base_dir)
 
         context_text = _build_context(pure_docs, use_guide_raw=use_guide_raw)
         history_text = _format_history(chat_history or [])
@@ -311,14 +377,14 @@ def setup_design_bot(
             "chat_history": history_text,
         }
 
-        # GPT(컴포즈 전용): Gauss 호출 없이 "완성된 프롬프트 문자열"만 반환.
+        # GPT(컴포즈 전용): Gauss 호출 없이 "완성된 프롬프트 문자열"만 반환. (이미지는 동일하게 반환)
         if compose_only:
             selected_prompt = case_prompts.get(case, answer_prompt)
             msgs = selected_prompt.format_messages(**invoke_input)
-            return "\n\n".join(getattr(m, "content", str(m)) for m in msgs)
+            return "\n\n".join(getattr(m, "content", str(m)) for m in msgs), images
 
         selected_chain = case_chains.get(case, answer_chain)
-        return selected_chain.invoke(invoke_input)
+        return selected_chain.invoke(invoke_input), images
 
     def rag_handler_stream(query: str, chat_history: list = None, case: int = 1, synonym_hint: str = ""):
         raw_docs = search_client._retriever(query)

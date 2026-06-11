@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import sys
@@ -103,10 +104,33 @@ def _get_or_load_bot(domain_key: str, db_keys: list):
         domain_config = domain_config,
         vector_dbs    = vector_dbs,
         exp_config    = exp_config,
+        domain_key    = domain_key,
     )
     _bot_cache[cache_key] = bot
     logger.info(f"봇 로드 완료: {cache_key}")
     return bot
+
+
+# 응답에 실을 이미지 최대 개수 (base64 임베드라 페이로드 크기 관리용)
+IMAGE_MAX = 4
+
+
+def _encode_images(images: list) -> list:
+    """[{path,name,score_pct}] → [{name,score_pct,data(base64)}] (상위 IMAGE_MAX개)."""
+    out = []
+    for img in (images or [])[:IMAGE_MAX]:
+        path = img.get("path", "")
+        try:
+            with open(path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("ascii")
+            out.append({
+                "name":      img.get("name", os.path.basename(path)),
+                "score_pct": img.get("score_pct"),
+                "data":      b64,
+            })
+        except Exception as e:
+            logger.warning(f"이미지 인코딩 실패 [{img.get('name')}]: {e}")
+    return out
 
 
 # ── 라우터 ───────────────────────────────────────────────────────
@@ -264,7 +288,7 @@ class Handler(BaseHTTPRequestHandler):
 
             try:
                 bot    = _get_or_load_bot(domain_key, db_keys)
-                result = bot(
+                result, images = bot(
                     rewritten_q,
                     chat_history = history,
                     case         = case,
@@ -280,6 +304,8 @@ class Handler(BaseHTTPRequestHandler):
                 }
                 # GPT: 완성 프롬프트만(prompt) / Gauss: 생성된 답변(answer)
                 resp_body["prompt" if for_gpt else "answer"] = result
+                # 이미지: Gauss·GPT 공통 (검색된 문서 기준) — base64 임베드
+                resp_body["images"] = _encode_images(images)
                 self._send_json(HTTPStatus.OK, resp_body)
             except Exception as e:
                 logger.error(f"RAG 오류 [{domain_key}]: {e}")

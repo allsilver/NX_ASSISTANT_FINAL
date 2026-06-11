@@ -7,6 +7,7 @@ using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using NxAssistant.Mcp;
 
 namespace NxAssistant.Providers;
 
@@ -20,6 +21,9 @@ public class GaussProvider : ILlmProvider
 
     /// <summary>검색할 db_key 목록. 비어있으면 서버가 도메인 전체 검색. (LlmSession.SetDbKeys 로 설정)</summary>
     public string[] DbKeys { get; set; } = Array.Empty<string>();
+
+    /// <summary>직전 ChatAsync 응답에 실린 이미지 (검색된 표준 그림). 단일 질의 흐름이라 호출 직후 읽으면 안전.</summary>
+    public IReadOnlyList<RagImage> LastImages { get; private set; } = Array.Empty<RagImage>();
 
     private readonly HttpClient _http;
     private readonly string     _dbMcpUrl;
@@ -74,6 +78,7 @@ public class GaussProvider : ILlmProvider
             throw new InvalidOperationException($"DB MCP 오류 {(int)resp.StatusCode}: {text[..Math.Min(300, text.Length)]}");
 
         using var doc = JsonDocument.Parse(text);
+        LastImages = DbMcpClient.ParseImages(doc.RootElement);
         return doc.RootElement.TryGetProperty("answer", out var answer)
             ? answer.GetString() ?? ""
             : text;

@@ -13,7 +13,8 @@ public record DbMcpResult(
     string RewrittenQuery,
     string Domain,
     int    Case,
-    string Answer
+    string Answer,
+    IReadOnlyList<RagImage> Images
 );
 
 public record RouteResult(string Intent);
@@ -82,12 +83,33 @@ public class DbMcpClient
             RewrittenQuery: GetStr(result, "rewritten_query"),
             Domain:         GetStr(result, "domain"),
             Case:           result.TryGetProperty("case", out var c) ? c.GetInt32() : 1,
-            Answer:         GetStr(result, "answer")
+            Answer:         GetStr(result, "answer"),
+            Images:         ParseImages(result)
         );
     }
 
+    /// <summary>응답 JSON의 images[{name,score_pct,data(base64)}] → RagImage 목록 (base64 디코드).</summary>
+    public static IReadOnlyList<RagImage> ParseImages(JsonElement root)
+    {
+        if (!root.TryGetProperty("images", out var arr) || arr.ValueKind != JsonValueKind.Array)
+            return Array.Empty<RagImage>();
+
+        var list = new List<RagImage>();
+        foreach (var el in arr.EnumerateArray())
+        {
+            var name = el.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+            int? pct = el.TryGetProperty("score_pct", out var p) && p.ValueKind == JsonValueKind.Number
+                       ? p.GetInt32() : (int?)null;
+            var b64  = el.TryGetProperty("data", out var d) ? d.GetString() ?? "" : "";
+            if (string.IsNullOrEmpty(b64)) continue;
+            try { list.Add(new RagImage(name, pct, Convert.FromBase64String(b64))); }
+            catch { /* 깨진 base64 는 스킵 */ }
+        }
+        return list;
+    }
+
     /// <summary>GPT용: 서버가 검색+컨텍스트+프롬프트 조립까지 한 "완성 프롬프트"를 반환. (/mech/ask, for_gpt=true)</summary>
-    public async Task<string> GetGptPromptAsync(string question, string domain, string[] dbKeys, CancellationToken ct = default)
+    public async Task<(string Prompt, IReadOnlyList<RagImage> Images)> GetGptPromptAsync(string question, string domain, string[] dbKeys, CancellationToken ct = default)
     {
         // [임시 검증용] NX_ASSISTANT_FAKE_DBPROMPT=1 이면 서버 호출 없이 예시 프롬프트 반환.
         //  목적: DB MCP 서버가 없는 VDI 에서 GPT 분기(질문→프롬프트→GPT 답변)를 검증.
@@ -96,7 +118,7 @@ public class DbMcpClient
         if (!string.IsNullOrEmpty(fake) && fake.Trim() is "1" or "true" or "TRUE")
         {
             NxAssistant.Program.Log("[DbMcp] FAKE_DBPROMPT 사용 — 서버 미호출, 예시 프롬프트 반환");
-            return FakeGptPrompt(question);
+            return (FakeGptPrompt(question), Array.Empty<RagImage>());
         }
 
         var payload = new Dictionary<string, object?>
@@ -123,7 +145,8 @@ public class DbMcpClient
                 $"DB MCP ask(gpt) 오류 {(int)resp.StatusCode}: {text[..Math.Min(200, text.Length)]}");
 
         using var doc = JsonDocument.Parse(text);
-        return doc.RootElement.TryGetProperty("prompt", out var p) ? p.GetString() ?? "" : "";
+        var prompt = doc.RootElement.TryGetProperty("prompt", out var p) ? p.GetString() ?? "" : "";
+        return (prompt, ParseImages(doc.RootElement));
     }
 
     // [임시 검증용] 서버가 만들 RAG 프롬프트를 흉내낸 예시. 실제 검색 결과 아님(가짜 컨텍스트).

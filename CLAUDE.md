@@ -89,8 +89,9 @@ NX_ASSISTANT_FINAL/
 │   │   ├── GptProvider.cs           ← GPT (WorkerForm 래핑, userWorker만)
 │   │   └── LlmSession.cs            ← 앱 전역 LLM 선택 관리 (ILlmSession 구현)
 │   ├── mcp/
-│   │   ├── DbMcpClient.cs           ← DB 서버 HTTP 요청 (/mech/ask 등)
+│   │   ├── DbMcpClient.cs           ← DB 서버 HTTP 요청 (/mech/ask 등). 응답 images[] base64 파싱
 │   │   ├── DbKeyOption.cs           ← db_key 메타 레코드 (카드/프리뷰 공유, 네트워크 의존 없음)
+│   │   ├── RagImage.cs              ← 검색 표준 이미지 레코드 (name/score_pct/PNG바이트, 프리뷰 공유)
 │   │   └── NxMcpClient.cs           ← NX MCP 호출
 │   ├── history/HistoryManager.cs    ← 대화 히스토리
 │   ├── config/DbKeySelectionStore.cs← 도메인별 선택 db_key 로컬 저장 (%LOCALAPPDATA%\NX_Assistant\db_selection.json)

@@ -1,0 +1,8 @@
+# settings.json의 db_mcp_token 값을 $tok에
+$tok  = (Get-Content .\server\config\settings.json -Raw | ConvertFrom-Json).db_mcp_token
+$body = @{ question="댐퍼 프론트 설계 기준 알려줘"; domain="<실제_도메인키>"; for_gpt=$false } | ConvertTo-Json
+$r = Invoke-RestMethod -Uri "http://127.0.0.1:8766/mech/ask" -Method Post `
+      -Headers @{Authorization="Bearer $tok"} -ContentType "application/json" -Body $body
+"answer 길이: $($r.answer.Length)"
+"이미지 수: $($r.images.Count)"
+$r.images | ForEach-Object { "  [$($_.score_pct)%] $($_.name)  (base64 $($_.data.Length)자)" }

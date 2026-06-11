@@ -25,9 +25,28 @@
 - [ ] **전송 검증**: 전송 직후 생성이 실제 시작됐는지(예: stop 버튼) 확인해 send 실패 조기 포착.
 - [ ] (참고) 증상: 대화가 길어진 뒤 GPT는 답하는데 앱이 못 받고 멈춤 → 마커 방식으로 1차 해결. 추가 안정장치는 위 항목.
 
+### UI / 이미지 백로그 (다음 개선)
+- [ ] **창 크기 전체 재조정**: 이미지가 들어가니 기본 창이 작음. 메인 창 + **GPT 로그인 창** 크기 같이 키우기.
+- [ ] **이미지-답변 정합성**: 현재 이미지는 리랭크된 문서 전체에서 뽑힘(LLM이 실제 답변에 쓴 문서만은 아님). "자료 없음"류 답변에도 무관 이미지가 붙을 수 있음. → 절대 점수 임계값으로 거르기(meg도 알던 한계).
+- [ ] **관련성 % 계산**: 현재 리랭크 점수 min-max 정규화(이미지 적으면 최저=0%). 절대 점수(sigmoid 등) 기반으로 바꾸면 더 정직. 표시 자리는 이미 준비됨.
+
 ---
 
 ## ✅ 완료된 작업
+
+### 검색 이미지 출력 (서버 + 클라) — 로컬 실서버 검증 완료 (2026-06-11, V2.5)
+MEG_ChatBot_claude의 `_find_image_paths` 로직을 이식.
+- **서버**(`rag_engine.py` / `server.py`):
+  - `_find_image_paths(scored_docs)` 이식. 파일명 규칙 = `"{db_key} {full_path 마지막 2세그먼트}.png"`, 이미지 폴더 = `server/data/<domain>/image`.
+  - `setup_design_bot(domain_key=...)` 추가 → 도메인별 이미지 폴더 지정. `rag_handler`가 `(텍스트, 이미지[])` 반환.
+  - `/mech/ask` 응답에 `images:[{name, score_pct, data(base64)}]` 추가 (Gauss·GPT 공통, 멀티스레드 안전 — 봇 stash 대신 직접 반환). 최대 4장(`IMAGE_MAX`).
+- **클라**(`RagImage.cs` 신규, `DbMcpClient` / `GaussProvider` / `ILlmSession`(ChatEvent.Images) / `LlmSession` / `ChatView`):
+  - 응답의 base64 이미지 파싱 → `ChatEvent.ImageList`로 ChatView 전달 → 답변 아래 PictureBox(폭 맞춤·비율 유지) + 캡션 `(관련성 X%) 파일명`.
+  - **이미지 클릭 → 모달리스 팝업 확대**(여러 창·채팅 동시 사용, Esc/클릭 닫기).
+  - 마우스 휠 스크롤: 자식 컨트롤이 휠 가로채던 문제를 **앱 메시지 필터**로 해결. 바닥 **스페이서 행**으로 컴포저 위 여백 확보(FlowLayoutPanel은 bottom padding이 스크롤에 안 잡힘).
+  - 프리뷰(Mock)에 가짜 PNG 2장으로 렌더 검증 경로 추가.
+- 검증: 프리뷰(UI) + **로컬 Gauss 실서버(실이미지) 검증 완료.**
+
 
 ### GPT 분기(서버 검색→GPT 답변) + 홈 뒤로가기 — VDI 검증 완료 (2026-06-10, V2.3)
 

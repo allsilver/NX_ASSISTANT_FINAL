@@ -3,16 +3,22 @@
 // 실제 앱은 LlmSession 이 구현하고, UI 프리뷰는 MockLlmSession 이 구현한다.
 // → ChatView 가 서버/WebView2 의존(LlmSession 구현체)을 직접 알지 않게 분리.
 
+using NxAssistant.Mcp;
+
 namespace NxAssistant.Providers;
 
-public enum ChatEventKind { Status, Token, Done, Markdown }
+public enum ChatEventKind { Status, Token, Done, Markdown, Images }
 
-/// <summary>스트리밍 채팅 이벤트. Status=진행 멘트, Token=부분 답변(이어붙임), Markdown=완료 후 서식본, Done=완료.</summary>
+/// <summary>스트리밍 채팅 이벤트. Status=진행 멘트, Token=부분 답변(이어붙임), Markdown=완료 후 서식본, Images=검색 이미지, Done=완료.</summary>
 public readonly record struct ChatEvent(ChatEventKind Kind, string Text)
 {
+    /// <summary>Images 이벤트일 때 첨부되는 표준 이미지 목록.</summary>
+    public IReadOnlyList<RagImage>? Pics { get; init; }
+
     public static ChatEvent Status(string text)   => new(ChatEventKind.Status, text);
     public static ChatEvent Token(string text)    => new(ChatEventKind.Token, text);
     public static ChatEvent Markdown(string text) => new(ChatEventKind.Markdown, text);
+    public static ChatEvent ImageList(IReadOnlyList<RagImage> pics) => new(ChatEventKind.Images, "") { Pics = pics };
     public static ChatEvent Done()                => new(ChatEventKind.Done, "");
 }
 
