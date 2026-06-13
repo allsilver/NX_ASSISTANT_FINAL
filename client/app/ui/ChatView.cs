@@ -29,7 +29,7 @@ internal sealed class ChatView : Panel
     private static readonly Font MonoFont = new Font("Consolas", 9F);
     private static readonly Font CaptionFont = new Font("Malgun Gothic", 8F);
 
-    public ChatView(string domainName, ILlmSession session, Action onBack, Action onHome, Action onSettings)
+    public ChatView(string domainName, ILlmSession session, Action onBack, Action onHome, Action onSettings, string? greeting = null)
     {
         _domainName = string.IsNullOrEmpty(domainName) ? "채팅" : domainName;
         _session = session;
@@ -39,7 +39,7 @@ internal sealed class ChatView : Panel
         Controls.Add(BuildComposer());
         Controls.Add(BuildTopBar(onBack, onHome, onSettings));
 
-        AddAiMessage($"안녕하세요! {_domainName} 어시스턴트입니다.\n설계 관련 궁금한 점을 질문해 주세요.");
+        AddAiMessage(greeting ?? $"안녕하세요! {_domainName} 어시스턴트입니다.\n설계 관련 궁금한 점을 질문해 주세요.");
     }
 
     private Control BuildTopBar(Action onBack, Action onHome, Action onSettings)

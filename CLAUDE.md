@@ -2,6 +2,10 @@
 
 > 이 파일은 프로젝트의 구조·환경·규칙을 설명하는 정적 문서입니다.
 > 진행 상황과 할 일은 PROGRESS.md를 참조하세요.
+>
+> **버전 v2.6** (2026-06-11): 데모 3종 완성 — DB조회(실동작 RAG) + NX제어/자동화(스크립트·fake) + 브랜딩(로고/아이콘).
+> NX제어=`NxControlSession`(기본 스크립트, `NX_CONTROL_REAL=1`로 실제 브리지), 자동화=`AutomationSession`(`NX_AUTOMATION_FAKE=1`로 데모).
+> **다음 v3**: 실배포 형태로 정리(환경변수→설정파일 일원화, `ILlmSession`→`IChatSession`/`LlmSession`→`DbQuerySession` 리네이밍, 런처 정식화). 계획은 PROGRESS.md "v3 정리 계획".
 
 ---
 

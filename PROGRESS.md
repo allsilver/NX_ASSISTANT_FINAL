@@ -1,7 +1,8 @@
 # NX Assistant 개발 진행상황
 
-> 최종 업데이트: 2026-06-11
+> 최종 업데이트: 2026-06-11 · **버전: v2.6** (데모 3종 완성 — DB조회 실동작 + NX제어/자동화 스크립트 + 브랜딩)
 > 진행 상황과 다음 할 일만 기록합니다. 프로젝트 구조·환경·규칙은 CLAUDE.md 참조.
+> **다음: v3** — 실배포 형태로 정리(설정 일원화·리네이밍·런처 정식화). 아래 "v3 정리 계획" 참조.
 
 ---
 
@@ -15,11 +16,19 @@
 - [x] **NX 버튼 → 우리 앱 실행 연결 (로컬 검증 완료)**: HEROS "AI Assistant" → 현재 빌드 앱이 뜸.
   - 핵심: 설치된 런처(코덱스 experiments 스파이크 런처)는 `NX_ASSISTANT_WEBVIEW2_EXE` 환경변수를 읽음(`NX_ASSISTANT_EXE` 아님!). 이 변수에 우리 exe 전체경로 지정 → 버튼이 우리 앱 실행. (환경변수 상속 위해 로그오프/재로그인 필요)
 - [x] **GPT 경로 401 해결 (로컬)**: 클라 `DB_MCP_TOKEN`(Bearer) = 서버 유효토큰(`settings.json.db_mcp_token` 우선) 일치 + NX-실행 앱이 토큰 상속받도록. 인증은 Gauss/GPT 공통(서버 `_auth`).
+- [x] **NX제어 데모(스크립트)**: `NxControlSession` — 기본은 스크립트 응답(면 offset / 선 extrude / 엣지 blend), `NX_CONTROL_REAL=1` 시 실제 브리지(`verify_remoting_ready.py`). `ChatView` 인사말 화면별 커스텀 가능하게 옵션 추가.
+- [x] **자동화 데모**: `AutomationSession` — `NX_AUTOMATION_FAKE=1` 시 단계 멘트+요약(실제 브라우저는 수동 전환), 아니면 코덱스 knox 퀵신청 툴(`quick_delivery_automation`) 실행.
+- [x] **DB조회 프롬프트 단순화**: `MECH_STANDARD`(+case1/2)·`CMF_DFC` — 케이스/형식 강제·마크다운 금지 제거, GPT 자유 답변. (※ 챗봇 정규화 시 전면 재작성 예정. 원본은 서버 `.orig` 백업.)
 
-### 정리 필요 (시연 후) — "지저분한 것" 정돈
-- [ ] **NX 연동 깔끔하게 재설치**: 현재는 코덱스 experiments **스파이크 런처**가 `NX_ASSISTANT_WEBVIEW2_EXE`로 우리 exe를 띄우는 **임시 연결**. → 우리 전용 런처(`client/nx-launcher`, NxAssistant.exe를 직접 실행)로 빌드·재설치해 스파이크 의존 제거.
-- [ ] 임시 환경변수 정리: 잘못 설정했던 `NX_ASSISTANT_EXE` 제거, 연결 변수는 런처 재설치 후 정식 경로(publish)로 전환 검토.
-- [ ] 데모는 Debug 빌드 + 환경변수로 띄움 → 정식 배포 시 `publish/win-x64`(자체포함) 경로로 정리.
+### 🎯 v3 정리 계획 (실배포 형태로 — 기구팀 100명 NX 내장 배포가 목표)
+- [ ] **Phase 1 — v2.6 커밋**(현재): 데모 완성 상태 안전 기준점.
+- [ ] **Phase 2 — 클라이언트 설정 일원화** ⭐: 흩어진 환경변수 15개 → `AppConfig` + 단일 설정파일(JSON). 우선순위 **설정파일 > env > 빌트인 기본값**. 환경변수 상속 문제 근본 해결, 무설정 동작 + 가변항목(서버 URL·토큰)만 파일 하나.
+  - 대상: `DB_MCP_TOKEN`, `NX_ASSISTANT_DB_MCP_URL`, `NX_MCP_PORT`, `NX_AUTOMATION_*`, `NX_BRIDGE_*`, `NX_CONTROL_REAL`, `NX_AUTOMATION_FAKE` 등
+- [ ] **Phase 2 — 리네이밍(혼동 제거)**: `ILlmSession`→`IChatSession`, `LlmSession`→`DbQuerySession`(또는 `RagChatSession`). 3형제 대칭(DbQuery/NxControl/Automation), "LLM 쓰냐"와 이름 분리(셋 다 미래엔 LLM 씀).
+- [ ] **Phase 3 — 서버 데모 흔적 정리**: 단순 프롬프트 공식화(`.orig` 정리), `IMAGE_MAX` 정상값 유지.
+- [ ] **Phase 4 — 토글/플래그 문서화**: 미완성 기능(자동화 fake / NX제어 scripted)은 기능 유지하되 데모↔실제 토글을 설정파일에 명시. 개발 플래그(MODE/SHOW_WORKER/FAKE_DBPROMPT) 분류.
+- [ ] **Phase 5 — NX 런처 정식화(후순위)**: 코덱스 스파이크 런처 의존(`NX_ASSISTANT_WEBVIEW2_EXE`) 제거 → 우리 `client/nx-launcher` 재빌드·재설치. Debug+env 임시연결 → `publish/win-x64` 정식경로.
+- [ ] 미완성 기능은 차차 기능별 완성(NX제어 실제 OpenNX API, 자동화 실제 Playwright 등 — LLM이 도구/API 판단).
 
 ### 스트리밍 채팅 UX (V2.4 완료, 2026-06-11)
 - [x] 스트리밍 이벤트 인터페이스(ChatEvent: Status/Token/Done) + ChatView 소비

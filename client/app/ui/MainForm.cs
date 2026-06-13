@@ -109,8 +109,8 @@ public sealed class MainForm : Form
         var view = new FieldSelectView(
             onBack:      ShowAiSelect,
             onDbQuery:   ShowDomainSelect,
-            onNxControl: () => MessageBox.Show("NX 제어는 준비 중입니다.", "안내"),
-            onAuto:      () => MessageBox.Show("자동화 기능은 준비 중입니다.", "안내"));
+            onNxControl: ShowNxControl,
+            onAuto:      ShowAutomation);
         Swap(view);
     }
 
@@ -189,6 +189,29 @@ public sealed class MainForm : Form
         _session.DomainName = _domainName;   // 상태 멘트용 표시명 (예: "설계수순서 DB를 조회하는 중")
         var view = new ChatView(_domainName, _session,
             onBack: ShowDomainSelect,
+            onHome: ShowFieldSelect,
+            onSettings: ShowSettings);
+        Swap(view);
+    }
+
+    // ── 화면: NX 제어 (자연어 → 검증된 NX 브리지 명령 실행) ──
+    private void ShowNxControl()
+    {
+        var nx = new NxControlSession();
+        var view = new ChatView("NX 제어", nx,
+            onBack: ShowFieldSelect,
+            onHome: ShowFieldSelect,
+            onSettings: ShowSettings,
+            greeting: "안녕하세요. NX 제어 어시스턴트입니다. 실행하고 싶은 NX 기능을 알려주세요.");
+        Swap(view);
+    }
+
+    // ── 화면: 브라우저 자동화 (자연어 → 코덱스 퀵신청 자동화 툴 실행) ──
+    private void ShowAutomation()
+    {
+        var auto = new AutomationSession();
+        var view = new ChatView("브라우저 자동화", auto,
+            onBack: ShowFieldSelect,
             onHome: ShowFieldSelect,
             onSettings: ShowSettings);
         Swap(view);
