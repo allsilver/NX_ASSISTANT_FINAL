@@ -17,7 +17,7 @@ internal sealed class ChatView : Panel
     private WheelFilter?    _wheelFilter;
     private Panel?          _bottomSpacer;   // 목록 맨 아래 스크롤 가능한 여백 (FlowLayoutPanel은 bottom padding이 스크롤에 안 잡힘)
     private PillButton      _llmToggle = null!;
-    private readonly ILlmSession _session;
+    private readonly IChatSession _session;
     private readonly string _domainName;
     private bool _busy;
     private System.Windows.Forms.Timer? _dotsTimer;   // 진행 멘트 점(…) 애니메이션
@@ -29,7 +29,7 @@ internal sealed class ChatView : Panel
     private static readonly Font MonoFont = new Font("Consolas", 9F);
     private static readonly Font CaptionFont = new Font("Malgun Gothic", 8F);
 
-    public ChatView(string domainName, ILlmSession session, Action onBack, Action onHome, Action onSettings, string? greeting = null)
+    public ChatView(string domainName, IChatSession session, Action onBack, Action onHome, Action onSettings, string? greeting = null)
     {
         _domainName = string.IsNullOrEmpty(domainName) ? "채팅" : domainName;
         _session = session;

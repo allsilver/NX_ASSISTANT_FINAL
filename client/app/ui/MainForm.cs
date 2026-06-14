@@ -12,10 +12,9 @@ namespace NxAssistant.UI;
 public sealed class MainForm : Form
 {
     private readonly Panel _host;          // 화면 교체 영역
-    private readonly LlmSession _session;  // 앱 전역 LLM 세션
+    private readonly DbQuerySession _session;  // 앱 전역 LLM 세션
     private readonly DbMcpClient _dbMcp = new();           // dbkeys 조회용
-    private readonly bool _isVdi = (Environment.GetEnvironmentVariable("NX_ASSISTANT_MODE") ?? "")
-                                   .Trim().Equals("vdi", StringComparison.OrdinalIgnoreCase);  // VDI(개발) = 서버 체크 예외
+    private readonly bool _isVdi = NxAssistant.AppConfig.IsVdi;  // VDI(개발) = 서버 체크 예외
     private string   _domain     = "";     // 선택된 DB 도메인 키
     private string   _domainName = "";     // 도메인 표시명
     private string[] _dbKeys     = Array.Empty<string>();  // 선택된 db_key
@@ -30,7 +29,7 @@ public sealed class MainForm : Form
         BackColor     = Palette.Bg;
         Font          = new Font("Malgun Gothic", 9F);
 
-        _session = new LlmSession();
+        _session = new DbQuerySession();
         FormClosed += (_, _) => _session.Dispose();
 
         _host = new Panel { Dock = DockStyle.Fill, BackColor = Palette.Bg };

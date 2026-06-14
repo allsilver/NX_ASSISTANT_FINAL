@@ -121,10 +121,12 @@ public sealed class WorkerForm : Form
     return r.width > 0 && r.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
   }
   const composer = document.querySelector('#prompt-textarea');
-  const composerVisible = !!(composer && visible(composer));
+  const composerVisible = !!(composer && visible(composer) && composer.getAttribute('disabled') === null);
+  const bodyText = (document.body && document.body.innerText) || '';
+  const expired = /세션.{0,10}만료|session\s*expired|다시\s*로그인|sign\s*in\s*again|log\s*in\s*again/i.test(bodyText);
   const loggedOut = !!document.querySelector('button[data-testid="login-button"], a[href*="auth/login"]')
                     || /auth\.openai\.com|login|auth0/i.test(location.href);
-  return { url: location.href, title: document.title, hasComposer: !!(composerVisible && !loggedOut) };
+  return { url: location.href, title: document.title, hasComposer: !!(composerVisible && !loggedOut && !expired) };
 })()
 """);
         var result = JsonSerializer.Deserialize<ProbeResult>(

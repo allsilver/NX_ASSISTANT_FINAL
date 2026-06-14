@@ -16,10 +16,10 @@ public class GaussProvider : ILlmProvider
     public string Name    => "Gauss";
     public bool   IsReady => true;   // REST API는 항상 준비됨
 
-    /// <summary>현재 DB 도메인 키. /mech/ask 요청에 실림. (LlmSession.SetDomain 으로 설정)</summary>
+    /// <summary>현재 DB 도메인 키. /mech/ask 요청에 실림. (DbQuerySession.SetDomain 으로 설정)</summary>
     public string Domain  { get; set; } = "";
 
-    /// <summary>검색할 db_key 목록. 비어있으면 서버가 도메인 전체 검색. (LlmSession.SetDbKeys 로 설정)</summary>
+    /// <summary>검색할 db_key 목록. 비어있으면 서버가 도메인 전체 검색. (DbQuerySession.SetDbKeys 로 설정)</summary>
     public string[] DbKeys { get; set; } = Array.Empty<string>();
 
     /// <summary>직전 ChatAsync 응답에 실린 이미지 (검색된 표준 그림). 단일 질의 흐름이라 호출 직후 읽으면 안전.</summary>
@@ -31,9 +31,8 @@ public class GaussProvider : ILlmProvider
 
     public GaussProvider()
     {
-        _dbMcpUrl = Environment.GetEnvironmentVariable("NX_ASSISTANT_DB_MCP_URL")
-                    ?? "http://127.0.0.1:8766";
-        _token    = Environment.GetEnvironmentVariable("DB_MCP_TOKEN") ?? "";
+        _dbMcpUrl = NxAssistant.AppConfig.DbMcpUrl;
+        _token    = NxAssistant.AppConfig.DbMcpToken;
 
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         if (!string.IsNullOrEmpty(_token))

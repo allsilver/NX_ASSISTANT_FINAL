@@ -2,7 +2,7 @@
 
   <!-- UI 프리뷰 (개발 전용)
        - 본 앱(client/app)의 "순수 UI" 코드를 링크해서 같이 컴파일 → 화면 코드 1벌 공유
-       - 서버/WebView2 의존 없음. 데이터·LLM 답변은 MockLlmSession + mock 옵션으로 대체
+       - 서버/WebView2 의존 없음. 데이터·LLM 답변은 MockChatSession + mock 옵션으로 대체
        - 실행: cd client/ui-preview ; dotnet run   (VDI 에서 가볍게 빌드/확인) -->
 
   <PropertyGroup>
@@ -25,7 +25,7 @@
     <Compile Include="..\app\ui\DbKeySelectView.cs"  Link="shared\DbKeySelectView.cs" />
     <Compile Include="..\app\ui\ChatView.cs"         Link="shared\ChatView.cs" />
     <Compile Include="..\app\ui\SettingsView.cs"     Link="shared\SettingsView.cs" />
-    <Compile Include="..\app\providers\ILlmSession.cs" Link="shared\ILlmSession.cs" />
+    <Compile Include="..\app\providers\IChatSession.cs" Link="shared\IChatSession.cs" />
     <Compile Include="..\app\mcp\DbKeyOption.cs"     Link="shared\DbKeyOption.cs" />
     <Compile Include="..\app\mcp\RagImage.cs"        Link="shared\RagImage.cs" />
     <Compile Include="..\app\config\DbKeySelectionStore.cs" Link="shared\DbKeySelectionStore.cs" />

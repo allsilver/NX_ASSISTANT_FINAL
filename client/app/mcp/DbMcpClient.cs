@@ -32,9 +32,8 @@ public class DbMcpClient
 
     public DbMcpClient()
     {
-        var url   = Environment.GetEnvironmentVariable("NX_ASSISTANT_DB_MCP_URL")
-                    ?? "http://127.0.0.1:8766";
-        var token = Environment.GetEnvironmentVariable("DB_MCP_TOKEN") ?? "";
+        var url   = NxAssistant.AppConfig.DbMcpUrl;
+        var token = NxAssistant.AppConfig.DbMcpToken;
 
         _baseUri = new Uri(url.TrimEnd('/') + "/");
         _http    = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
@@ -111,11 +110,8 @@ public class DbMcpClient
     /// <summary>GPT용: 서버가 검색+컨텍스트+프롬프트 조립까지 한 "완성 프롬프트"를 반환. (/mech/ask, for_gpt=true)</summary>
     public async Task<(string Prompt, IReadOnlyList<RagImage> Images)> GetGptPromptAsync(string question, string domain, string[] dbKeys, CancellationToken ct = default)
     {
-        // [임시 검증용] NX_ASSISTANT_FAKE_DBPROMPT=1 이면 서버 호출 없이 예시 프롬프트 반환.
-        //  목적: DB MCP 서버가 없는 VDI 에서 GPT 분기(질문→프롬프트→GPT 답변)를 검증.
-        //  실서버 테스트/배포 시엔 이 환경변수를 끌 것. (자세한 배경: DEV_ENVIRONMENT.md 2장)
-        var fake = Environment.GetEnvironmentVariable("NX_ASSISTANT_FAKE_DBPROMPT");
-        if (!string.IsNullOrEmpty(fake) && fake.Trim() is "1" or "true" or "TRUE")
+        // [개발용] FakeDbPrompt 가 켜지면 서버 호출 없이 예시 프롬프트 반환 (서버 없는 VDI에서 GPT 분기 검증).
+        if (NxAssistant.AppConfig.FakeDbPrompt)
         {
             NxAssistant.Program.Log("[DbMcp] FAKE_DBPROMPT 사용 — 서버 미호출, 예시 프롬프트 반환");
             return (FakeGptPrompt(question), Array.Empty<RagImage>());

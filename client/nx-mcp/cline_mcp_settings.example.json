@@ -1,0 +1,16 @@
+﻿{
+  "mcpServers": {
+    "nx-local": {
+      "command": "python",
+      "args": [
+        "C:\\Users\\daeun.seo\\Documents\\Codex\\2026-05-19\\mcp\\nx-mcp-demo\\nx_mcp_server.py"
+      ],
+      "env": {
+        "NX_MCP_WORKSPACE": "C:\\Users\\daeun.seo\\Documents\\Codex\\2026-05-19\\mcp\\nx-mcp-demo\\workspace",
+        "NX_MCP_ALLOW_EXECUTE": "0"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}

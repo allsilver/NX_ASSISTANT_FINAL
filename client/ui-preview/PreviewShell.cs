@@ -14,7 +14,7 @@ namespace NxAssistant.UI;
 internal sealed class PreviewShell : Form
 {
     private readonly Panel _host;
-    private readonly MockLlmSession _session = new();
+    private readonly MockChatSession _session = new();
     private string _domain = "";
     private string _domainName = "";
     private string[] _dbKeys = Array.Empty<string>();

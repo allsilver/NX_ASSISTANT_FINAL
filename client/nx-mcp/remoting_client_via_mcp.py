@@ -289,7 +289,7 @@ def main() -> None:
                 },
             )
         elif action in {"hinge", "hinge-section"}:
-            section_name = sys.argv[2] if len(sys.argv) > 2 else "MECH Hinge Housing Section"
+            section_name = sys.argv[2] if len(sys.argv) > 2 else "MEG Hinge Housing Section"
             width = float(sys.argv[3]) if len(sys.argv) > 3 else 80.0
             height = float(sys.argv[4]) if len(sys.argv) > 4 else 12.0
             spring_wall = float(sys.argv[5]) if len(sys.argv) > 5 else 0.38
@@ -307,7 +307,7 @@ def main() -> None:
                     "screw_wall_mm": screw_wall,
                     "fpcb_floor_mm": fpcb_floor,
                     "side_wall_mm": screw_wall,
-                    "source_note": "MECH DB wall-thickness POC defaults or extracted values",
+                    "source_note": "MEG DB wall-thickness POC defaults or extracted values",
                 },
             )
         elif action == "stop":

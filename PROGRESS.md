@@ -21,11 +21,13 @@
 - [x] **DB조회 프롬프트 단순화**: `MECH_STANDARD`(+case1/2)·`CMF_DFC` — 케이스/형식 강제·마크다운 금지 제거, GPT 자유 답변. (※ 챗봇 정규화 시 전면 재작성 예정. 원본은 서버 `.orig` 백업.)
 
 ### 🎯 v3 정리 계획 (실배포 형태로 — 기구팀 100명 NX 내장 배포가 목표)
-- [ ] **Phase 1 — v2.6 커밋**(현재): 데모 완성 상태 안전 기준점.
-- [ ] **Phase 2 — 클라이언트 설정 일원화** ⭐: 흩어진 환경변수 15개 → `AppConfig` + 단일 설정파일(JSON). 우선순위 **설정파일 > env > 빌트인 기본값**. 환경변수 상속 문제 근본 해결, 무설정 동작 + 가변항목(서버 URL·토큰)만 파일 하나.
-  - 대상: `DB_MCP_TOKEN`, `NX_ASSISTANT_DB_MCP_URL`, `NX_MCP_PORT`, `NX_AUTOMATION_*`, `NX_BRIDGE_*`, `NX_CONTROL_REAL`, `NX_AUTOMATION_FAKE` 등
-- [ ] **Phase 2 — 리네이밍(혼동 제거)**: `ILlmSession`→`IChatSession`, `LlmSession`→`DbQuerySession`(또는 `RagChatSession`). 3형제 대칭(DbQuery/NxControl/Automation), "LLM 쓰냐"와 이름 분리(셋 다 미래엔 LLM 씀).
-- [ ] **Phase 3 — 서버 데모 흔적 정리**: 단순 프롬프트 공식화(`.orig` 정리), `IMAGE_MAX` 정상값 유지.
+- [x] **Phase 1 — v2.6 커밋**: 데모 완성 상태 안전 기준점.
+- [x] **Phase 2 — 클라이언트 설정 일원화** ⭐ (v3): `AppConfig`(`client/app/AppConfig.cs`) + `appsettings.json` 도입. 우선순위 **설정파일 > 환경변수 > 기본값**. 앱 내 `GetEnvironmentVariable` 직접 읽기 **0개**(전부 AppConfig 경유). 경로형(`NxBridgeDir`/`AutomationDir`)은 상대경로면 앱 exe 폴더 기준 해석 → 배포 안전. 100명 배포 시 보통 `DbMcpUrl`/`DbMcpToken`만 채우면 됨.
+- [x] **Phase 2 — 데모 코드 삭제** (v3): `NxControlSession` 스크립트 응답·`AutomationSession` fake/스크린샷 경로 통째 제거 → **실제 브리지/툴 호출만** 남김. 데모 토글 env(`NX_AUTOMATION_FAKE`/`NX_CONTROL_REAL`/`NX_AUTOMATION_SCREENSHOT`) 삭제.
+- [x] **툴 흡수 (v3, VDI)**: NX 브리지(codex nx-local)·자동화(knox_mail_automation, MEG repo handoff)를 repo로 흡수 → `client/nx-mcp/`(DLL 포함)·`client/automation/`. 빌드 시 exe 옆 복사(csproj), appsettings 상대경로로 해석 → repo self-contained(F드라이브·외부 repo 의존 제거). NX DLL은 버전 안 맞을 때만 재빌드(로컬).
+- [x] **Phase 3 — 프롬프트 원본 백업** (v3): `.orig` → `server/db-mcp/prompts/_backup/*.original.txt`로 보존(삭제 안 함). 추후 프롬프트 전면 재작성 시 참고.
+- [x] **Phase 2 — 리네이밍(혼동 제거)** (v3): `ILlmSession`→`IChatSession`, `LlmSession`→`DbQuerySession`, `MockLlmSession`→`MockChatSession`. 파일명·타입·참조 전부. 3형제 대칭(DbQuery/NxControl/Automation).
+- [~] **GPT 워커 안정화 (진행중)** (v3): 세션 만료 감지 추가(ProbeAsync가 "세션 만료"/disabled composer 감지) + **전송 직전 재확인**(ChatAsync/ChatStreamAsync가 보내기 전 재probe → 만료면 silently 통과 대신 "재로그인" 안내). ※ 만료 DOM 정규식은 실제 페이지로 튜닝 필요. 자동재시도·멈춤 워치독은 잔여.
 - [ ] **Phase 4 — 토글/플래그 문서화**: 미완성 기능(자동화 fake / NX제어 scripted)은 기능 유지하되 데모↔실제 토글을 설정파일에 명시. 개발 플래그(MODE/SHOW_WORKER/FAKE_DBPROMPT) 분류.
 - [ ] **Phase 5 — NX 런처 정식화(후순위)**: 코덱스 스파이크 런처 의존(`NX_ASSISTANT_WEBVIEW2_EXE`) 제거 → 우리 `client/nx-launcher` 재빌드·재설치. Debug+env 임시연결 → `publish/win-x64` 정식경로.
 - [ ] 미완성 기능은 차차 기능별 완성(NX제어 실제 OpenNX API, 자동화 실제 Playwright 등 — LLM이 도구/API 판단).

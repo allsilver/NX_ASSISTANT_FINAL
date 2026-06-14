@@ -730,14 +730,14 @@ def tool_nx_remoting_create_extruded_rectangle(args: dict[str, Any]) -> dict[str
 
 
 def tool_nx_remoting_create_hinge_housing_section(args: dict[str, Any]) -> dict[str, Any]:
-    section_name = str(args.get("section_name", "MECH Hinge Housing Section"))
+    section_name = str(args.get("section_name", "MEG Hinge Housing Section"))
     overall_width = str(float(args.get("overall_width_mm", args.get("width_mm", 80))))
     overall_height = str(float(args.get("overall_height_mm", args.get("height_mm", 12))))
     spring_wall = str(float(args.get("spring_wall_mm", 0.38)))
     screw_wall = str(float(args.get("screw_wall_mm", 0.50)))
     fpcb_floor = str(float(args.get("fpcb_floor_mm", 0.40)))
     side_wall = str(float(args.get("side_wall_mm", args.get("screw_wall_mm", 0.50))))
-    source_note = str(args.get("source_note", "MECH DB 기준값을 사용한 POC 단면"))
+    source_note = str(args.get("source_note", "MEG DB 기준값을 사용한 POC 단면"))
     payload = run_remoting_client(
         [
             "hinge_section",
@@ -759,7 +759,7 @@ def tool_nx_remoting_create_hinge_housing_section(args: dict[str, Any]) -> dict[
     }
     payload["input_evidence"] = args.get("evidence", [])
     payload["workflow_hint"] = (
-        "Use this tool after querying the MECH DB for wall-thickness evidence. "
+        "Use this tool after querying the MEG DB for wall-thickness evidence. "
         "Pass the extracted minimum values and summarize the DB sources in source_note/evidence."
     )
     return payload
@@ -1157,29 +1157,29 @@ TOOLS = {
     },
     "nx_remoting_create_hinge_housing_section": {
         "description": (
-            "Create a MECH-informed hinge housing basic section sketch. "
-            "Call the MECH DB/API first, then pass extracted wall-thickness values and evidence here."
+            "Create a MEG-informed hinge housing basic section sketch. "
+            "Call the MEG DB/API first, then pass extracted wall-thickness values and evidence here."
         ),
         "inputSchema": {
             "type": "object",
             "properties": {
-                "section_name": {"type": "string", "default": "MECH Hinge Housing Section"},
+                "section_name": {"type": "string", "default": "MEG Hinge Housing Section"},
                 "overall_width_mm": {"type": "number", "default": 80},
                 "overall_height_mm": {"type": "number", "default": 12},
                 "spring_wall_mm": {
                     "type": "number",
                     "default": 0.38,
-                    "description": "Minimum spring-side wall thickness from MECH evidence.",
+                    "description": "Minimum spring-side wall thickness from MEG evidence.",
                 },
                 "screw_wall_mm": {
                     "type": "number",
                     "default": 0.5,
-                    "description": "Minimum wall around central screw area from MECH evidence.",
+                    "description": "Minimum wall around central screw area from MEG evidence.",
                 },
                 "fpcb_floor_mm": {
                     "type": "number",
                     "default": 0.4,
-                    "description": "Minimum CTC FPCB floor thickness from MECH evidence.",
+                    "description": "Minimum CTC FPCB floor thickness from MEG evidence.",
                 },
                 "side_wall_mm": {
                     "type": "number",
@@ -1188,12 +1188,12 @@ TOOLS = {
                 },
                 "source_note": {
                     "type": "string",
-                    "default": "MECH DB 기준값을 사용한 POC 단면",
+                    "default": "MEG DB 기준값을 사용한 POC 단면",
                 },
                 "evidence": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Short source snippets or titles from the MECH DB search.",
+                    "description": "Short source snippets or titles from the MEG DB search.",
                 },
             },
             "additionalProperties": False,

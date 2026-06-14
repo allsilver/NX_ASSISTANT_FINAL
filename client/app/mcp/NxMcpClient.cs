@@ -21,9 +21,7 @@ public class NxMcpClient
 
     public NxMcpClient()
     {
-        var port = int.Parse(
-            Environment.GetEnvironmentVariable("NX_MCP_PORT") ?? "8792");
-        _baseUri = new Uri($"http://127.0.0.1:{port}/");
+        _baseUri = new Uri($"http://127.0.0.1:{NxAssistant.AppConfig.NxMcpPort}/");
         _http    = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
     }
 

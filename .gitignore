@@ -28,3 +28,12 @@ runtime/*
 !runtime/.gitkeep
 logs/*
 !logs/.gitkeep
+
+# 로컬 전용 설정 (토큰·개발 플래그 — 커밋 금지)
+client/app/appsettings.local.json
+
+# 흡수된 파이썬 툴 캐시
+__pycache__/
+*.pyc
+client/automation/**/__pycache__/
+client/nx-mcp/**/__pycache__/

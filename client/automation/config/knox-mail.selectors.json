@@ -1,0 +1,65 @@
+{
+  "portalUrl": "http://kor1.samsung.net/portalapp/home",
+  "mailUrls": [
+    "http://kor1.samsung.net/mailapp/",
+    "http://kor1.samsung.net/portalapp/home/mail",
+    "http://kor1.samsung.net/portalapp/home/ML"
+  ],
+  "mailEntrypoints": [
+    "role=link[name=/메일|Mail|mail/i]",
+    "role=button[name=/메일|Mail|mail/i]",
+    "text=/메일|Mail/i",
+    "[data-testid*='mail' i]",
+    "[href*='mail' i]"
+  ],
+  "composeButtons": [
+    "role=button[name=/메일쓰기|새 메일|작성|Compose|New mail/i]",
+    "role=link[name=/메일쓰기|새 메일|작성|Compose|New mail/i]",
+    "role=button[name=/쓰기|Write/i]",
+    "role=link[name=/쓰기|Write/i]",
+    "text=/메일쓰기|새 메일|작성|Compose|New mail/i",
+    "text=/쓰기|Write/i",
+    "[data-testid*='compose' i]"
+  ],
+  "recipientInputs": [
+    "role=textbox[name=/받는 사람|수신자|To/i]",
+    "input[aria-label*='받는' i]",
+    "input[aria-label*='수신자' i]",
+    "input[aria-label*='To' i]",
+    "textarea[aria-label*='받는' i]",
+    "[contenteditable='true'][aria-label*='받는' i]",
+    "[data-testid*='recipient' i]",
+    "[name*='to' i]"
+  ],
+  "subjectInputs": [
+    "role=textbox[name=/제목|Subject/i]",
+    "input[aria-label*='제목' i]",
+    "input[aria-label*='Subject' i]",
+    "input[name*='subject' i]",
+    "[data-testid*='subject' i]"
+  ],
+  "bodyInputs": [
+    "role=textbox[name=/본문|내용|Body|Message/i]",
+    "iframe[title*='본문' i]",
+    "iframe[title*='Body' i]",
+    "[contenteditable='true'][aria-label*='본문' i]",
+    "[contenteditable='true'][aria-label*='내용' i]",
+    "[contenteditable='true']",
+    "textarea[aria-label*='본문' i]",
+    "textarea[name*='body' i]",
+    "[data-testid*='body' i]"
+  ],
+  "sendButtons": [
+    "role=button[name=/보내기|발송|전송|Send/i]",
+    "text=/보내기|발송|전송|Send/i",
+    "[data-testid*='send' i]"
+  ],
+  "confirmationButtons": [
+    "role=button[name=/확인|예|OK|Yes/i]",
+    "text=/확인|예|OK|Yes/i"
+  ],
+  "sentSuccessSignals": [
+    "text=/발송되었습니다|전송되었습니다|sent|Sent/i",
+    "role=status"
+  ]
+}

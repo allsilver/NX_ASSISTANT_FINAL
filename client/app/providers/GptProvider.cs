@@ -49,12 +49,10 @@ public class GptProvider : ILlmProvider
     // 사용자 질의 → 일반 채팅 워커로 답변
     public async Task<string> ChatAsync(string prompt, CancellationToken ct = default)
     {
-        if (!IsReady)
-            throw new InvalidOperationException("GPT가 준비되지 않았습니다. 로그인 창에서 로그인하세요.");
+        if (!await ProbeReadyAsync())   // 전송 직전 재확인: 세션 만료를 그냥 통과하지 않도록
+            throw new InvalidOperationException("GPT 로그인 세션이 만료되었거나 준비되지 않았습니다. 설정 → 외부 AI 재로그인 후 다시 시도하세요.");
 
-        // [디버그] NX_ASSISTANT_SHOW_WORKER=1 이면 워커 창을 띄워 동작을 직접 관찰 (평소엔 화면 밖).
-        var show = Environment.GetEnvironmentVariable("NX_ASSISTANT_SHOW_WORKER");
-        if (!string.IsNullOrEmpty(show) && show.Trim() is "1" or "true" or "TRUE")
+        if (NxAssistant.AppConfig.ShowWorker)   // [디버그] 워커 창 표시 (평소엔 화면 밖)
             _userWorker.ShowForLogin();
         else
             _userWorker.ParkOffscreen();
@@ -65,11 +63,10 @@ public class GptProvider : ILlmProvider
     // 스트리밍: 워커가 내보내는 누적 스냅샷을 그대로 흘려보냄.
     public async IAsyncEnumerable<string> ChatStreamAsync(string prompt, [EnumeratorCancellation] CancellationToken ct = default)
     {
-        if (!IsReady)
-            throw new InvalidOperationException("GPT가 준비되지 않았습니다. 로그인 창에서 로그인하세요.");
+        if (!await ProbeReadyAsync())   // 전송 직전 재확인: 세션 만료를 그냥 통과하지 않도록
+            throw new InvalidOperationException("GPT 로그인 세션이 만료되었거나 준비되지 않았습니다. 설정 → 외부 AI 재로그인 후 다시 시도하세요.");
 
-        var show = Environment.GetEnvironmentVariable("NX_ASSISTANT_SHOW_WORKER");
-        if (!string.IsNullOrEmpty(show) && show.Trim() is "1" or "true" or "TRUE")
+        if (NxAssistant.AppConfig.ShowWorker)
             _userWorker.ShowForLogin();
         else
             _userWorker.ParkOffscreen();

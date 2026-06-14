@@ -31,8 +31,7 @@ public class RouterClient
         _nxMcp   = nxMcp;
         _history = history;
 
-        var mode = Environment.GetEnvironmentVariable("NX_ASSISTANT_MODE") ?? "";
-        _bypassByEnv = mode.Trim().Equals("vdi", StringComparison.OrdinalIgnoreCase);
+        _bypassByEnv = NxAssistant.AppConfig.IsVdi;
     }
 
     public async Task<ChatResult> HandleAsync(

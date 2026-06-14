@@ -52,4 +52,13 @@
     <EmbeddedResource Include="ui\assets\gauss_logo.png" />
     <EmbeddedResource Include="ui\assets\chatgpt_logo.png" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="appsettings.local.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!-- 흡수된 NX 브리지 / 자동화 툴을 exe 옆으로 복사 → appsettings의 상대경로(nx-mcp/automation)가 해석됨 -->
+  <ItemGroup>
+    <None Include="..\nx-mcp\**\*" Link="nx-mcp\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\automation\**\*" Link="automation\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
