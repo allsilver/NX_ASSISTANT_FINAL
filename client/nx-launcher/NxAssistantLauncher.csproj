@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- NX HEROS 버튼 → NxAssistant.exe 를 여는 NXOpen DLL.
+       빌드 후 install.ps1 실행 → nx-customization/application/ 에 복사.
+       NxAssistant.exe 경로는 application/launcher.json 에 지정. -->
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>NxAssistantLauncher</AssemblyName>
+    <RootNamespace>NxAssistantLauncher</RootNamespace>
+
+    <!-- NX SDK managed DLL 경로: UGII_BASE_DIR 우선, 기본값 C:\SCAD\NX2406 -->
+    <NxManagedDir Condition="'$(UGII_BASE_DIR)' != ''">$(UGII_BASE_DIR)\NXBIN\managed</NxManagedDir>
+    <NxManagedDir Condition="'$(NxManagedDir)' == ''">C:\SCAD\NX2406\NXBIN\managed</NxManagedDir>
+  </PropertyGroup>
+
+  <!-- NXOpen 참조: 빌드 결과물에 복사 안 함(NX가 이미 로드) -->
+  <ItemGroup>
+    <Reference Include="NXOpen">
+      <HintPath>$(NxManagedDir)\NXOpen.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="NXOpen.Utilities">
+      <HintPath>$(NxManagedDir)\NXOpen.Utilities.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="NXOpenUI">
+      <HintPath>$(NxManagedDir)\NXOpenUI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

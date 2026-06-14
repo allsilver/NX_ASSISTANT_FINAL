@@ -1,43 +1,50 @@
 // nx-launcher/src/NxAssistantLauncher.cs
 // NX HEROS 버튼 → NxAssistant.exe 실행
-// 경로: client/app/publish/win-x64/ 를 기준으로 탐색
+//
+// exe 경로 우선순위:
+//   1. 환경변수 NX_ASSISTANT_EXE
+//   2. DLL 옆 launcher.json 의 NxAssistantExe 키
+//   3. DLL 옆 NxAssistant.exe (publish 배포 시)
+//
+// launcher.json 예시:
+//   { "NxAssistantExe": "C:\\path\\to\\NxAssistant.exe" }
+//
+// 설치 위치: nx-customization/application/NxAssistantLauncher.dll
+//           nx-customization/application/launcher.json  ← 여기 경로 채워넣기
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Threading;
+using System.Text.Json;
 using NXOpen;
 
 public class NxAssistantLauncher
 {
-    private const string AssistantExeName  = "NxAssistant.exe";
-    private const string AssistantTitle    = "NX Assistant";
-    // 프로젝트 루트 기준 상대 경로
-    private const string RelativeExePath   = @"client\app\publish\win-x64\NxAssistant.exe";
+    private const string AssistantExeName = "NxAssistant.exe";
+    private const string AssistantTitle   = "NX Assistant";
 
-    private static string _projectRoot = "";
+    private static string _launcherDir = "";
     private static string _logPath     = "";
+    private static bool   _inited;
     private static bool   _menuRegistered;
 
-    [DllImport("user32.dll")]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
-    [DllImport("user32.dll")]
-    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-    [DllImport("user32.dll")]
-    private static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] private static extern IntPtr FindWindow(string? lpClassName, string lpWindowName);
 
-    public static void Main(string[] args) => OpenAssistantFromNx("manual");
-
+    // NX 스타트업 DLL 진입점
     public static int Startup()
     {
-        InitRuntime(false);
+        Init();
         RegisterMenu();
         return 0;
     }
 
-    public static int ApplicationInit()  { InitRuntime(false); return 0; }
+    // NX 애플리케이션 DLL 진입점
+    public static int ApplicationInit()  { Init(); return 0; }
     public static int ApplicationEnter() { OpenAssistantFromNx("application button"); return 0; }
     public static int ApplicationExit()  { return 0; }
 
@@ -56,56 +63,72 @@ public class NxAssistantLauncher
     // ── 핵심: 어시스턴트 창 열기 ─────────────────────────────────
     private static void OpenAssistantFromNx(string reason)
     {
-        InitRuntime(true);
+        Init();
         Log($"어시스턴트 요청: {reason}");
 
-        // 이미 열려있으면 앞으로 가져오기
         if (BringExistingWindow()) { Log("기존 창 포커스"); return; }
 
-        // exe 실행
         var exePath = ResolveExePath();
         if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
         {
+            var cfgPath = Path.Combine(_launcherDir, "launcher.json");
             Log($"실행 파일 없음: {exePath}");
-            TryWriteListing($"NX Assistant 실행 파일을 찾을 수 없습니다.\n경로: {exePath}");
+            ShowMessage(
+                $"NX Assistant 실행 파일을 찾을 수 없습니다.\n\n" +
+                $"launcher.json 의 NxAssistantExe 에 NxAssistant.exe 전체 경로를 입력해 주세요.\n\n" +
+                $"launcher.json 위치:\n{cfgPath}");
             return;
         }
 
         var psi = new ProcessStartInfo(exePath) { UseShellExecute = true };
-        psi.EnvironmentVariables["NX_ASSISTANT_HOME"]        = _projectRoot;
-        psi.EnvironmentVariables["NX_ASSISTANT_DB_MCP_URL"]  =
-            Environment.GetEnvironmentVariable("NX_ASSISTANT_DB_MCP_URL") ?? "http://127.0.0.1:8766";
-
         Process.Start(psi);
-        Log($"어시스턴트 시작: {exePath}");
-        TryWriteListing("NX Design Assistant가 열렸습니다.");
+        Log($"Started: {exePath}");
     }
 
     private static bool BringExistingWindow()
     {
         var hwnd = FindWindow(null, AssistantTitle);
         if (hwnd == IntPtr.Zero) return false;
-        ShowWindow(hwnd, 9); // SW_RESTORE
+        ShowWindow(hwnd, 9);  // SW_RESTORE
         SetForegroundWindow(hwnd);
         return true;
     }
 
+    // 우선순위: 환경변수 → launcher.json → DLL 옆 NxAssistant.exe
     private static string ResolveExePath()
     {
-        // 1. 환경변수 우선
         var fromEnv = Environment.GetEnvironmentVariable("NX_ASSISTANT_EXE");
         if (!string.IsNullOrWhiteSpace(fromEnv)) return fromEnv;
 
-        // 2. 프로젝트 루트 기준 상대 경로
-        return Path.Combine(_projectRoot, RelativeExePath);
+        var cfgPath = Path.Combine(_launcherDir, "launcher.json");
+        if (File.Exists(cfgPath))
+        {
+            try
+            {
+                var doc = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(File.ReadAllText(cfgPath));
+                if (doc != null && doc.TryGetValue("NxAssistantExe", out var v) && v.ValueKind == JsonValueKind.String)
+                {
+                    var p = v.GetString();
+                    if (!string.IsNullOrWhiteSpace(p)) return p!;
+                }
+            }
+            catch (Exception e) { Log($"launcher.json 읽기 실패: {e.Message}"); }
+        }
+
+        return Path.Combine(_launcherDir, AssistantExeName);
     }
 
-    private static void InitRuntime(bool writeListing)
+    private static void Init()
     {
-        _projectRoot = ResolveProjectRoot();
-        Directory.CreateDirectory(Path.Combine(_projectRoot, "logs"));
-        _logPath = Path.Combine(_projectRoot, "logs", "nx-launcher.log");
-        if (writeListing) TryWriteListing("NX Design Assistant 시작 중...");
+        if (_inited) return;
+        _inited = true;
+        _launcherDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".";
+        var logDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "NX_Assistant", "logs");
+        Directory.CreateDirectory(logDir);
+        _logPath = Path.Combine(logDir, "nx-launcher.log");
+        Log($"NxAssistantLauncher initialized. DLL dir: {_launcherDir}");
     }
 
     private static void RegisterMenu()
@@ -129,24 +152,15 @@ public class NxAssistantLauncher
         catch (Exception ex) { Log($"NX 메뉴 등록 실패: {ex.Message}"); }
     }
 
-    private static string ResolveProjectRoot()
-    {
-        var fromEnv = Environment.GetEnvironmentVariable("NX_ASSISTANT_HOME");
-        if (!string.IsNullOrWhiteSpace(fromEnv)) return Path.GetFullPath(fromEnv);
-        var assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? ".";
-        // client/nx-launcher/src → 프로젝트 루트 (3단계 위)
-        return Path.GetFullPath(Path.Combine(assemblyDir, "..", "..", "..", ".."));
-    }
-
     private static void Log(string msg)
     {
         try { File.AppendAllText(_logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {msg}\n"); }
         catch { }
     }
 
-    private static void TryWriteListing(string msg)
+    private static void ShowMessage(string msg)
     {
-        try { UI.GetUI().NXMessageBox.Show("NX Assistant", NXMessageBox.DialogType.Information, msg); }
+        try { UI.GetUI().NXMessageBox.Show("NX Assistant", NXMessageBox.DialogType.Warning, msg); }
         catch { }
     }
 }

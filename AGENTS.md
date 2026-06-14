@@ -3,9 +3,9 @@
 > 이 파일은 프로젝트의 구조·환경·규칙을 설명하는 정적 문서입니다.
 > 진행 상황과 할 일은 PROGRESS.md를 참조하세요.
 >
-> **버전 v2.6** (2026-06-11): 데모 3종 완성 — DB조회(실동작 RAG) + NX제어/자동화(스크립트·fake) + 브랜딩(로고/아이콘).
-> NX제어=`NxControlSession`(기본 스크립트, `NX_CONTROL_REAL=1`로 실제 브리지), 자동화=`AutomationSession`(`NX_AUTOMATION_FAKE=1`로 데모).
-> **다음 v3**: 실배포 형태로 정리(환경변수→설정파일 일원화, `ILlmSession`→`IChatSession`/`LlmSession`→`DbQuerySession` 리네이밍, 런처 정식화). 계획은 PROGRESS.md "v3 정리 계획".
+> **버전 v3.1** (2026-06-14): 구파일 정리(ILlmSession/LlmSession/MockLlmSession 삭제) + NX 런처 정식화(csproj+config파일 기반).
+> 세션 3형제: `DbQuerySession`(DB조회, `IChatSession` 구현) / `NxControlSession`(NX제어) / `AutomationSession`(자동화).
+> NX 런처: `client/nx-launcher/` — `launcher.json`의 `NxAssistantExe`에 경로 지정, 환경변수 불필요.
 
 ---
 
@@ -51,7 +51,7 @@ Siemens NX(기계설계 CAD) 안에서 동작하는 AI 어시스턴트.
 
 ```
 (앱 시작) DB 서버 연결 확인 ── 실패(배포 환경) → "서버 연결 불가" 화면(진입 차단)
-   │                         └ VDI(NX_ASSISTANT_MODE=vdi)는 체크 예외
+   │                         └ VDI(Mode=vdi)는 체크 예외
    ↓ (연결 OK)
 AI 선택 (Gauss/GPT)         ← 최초 1회
    ↓
@@ -66,7 +66,6 @@ DB 도메인 선택 (설계수순서/DFC/CMF/DFM)
 
 - LLM 선택은 앱 전역 1개 설정. 도메인 바꿔도 유지. GPT 워커 1개 공유(로그인 1회).
 - 어느 도메인이 복수 DB인지는 **하드코딩하지 않고 서버 /mech/dbkeys 결과로 판단**(옵션 ≥2 → 페이지).
-- "관심분야 재설정"은 저장값이 있어도 페이지를 다시 띄움(force).
 - 1차 배포: 라우터 없음. 사용자가 모드/도메인 직접 선택.
 
 ---
@@ -83,15 +82,19 @@ NX_ASSISTANT_FINAL/
 │   │   ├── FieldSelectView.cs       ← 화면 1: 분야 선택 (순수 UI)
 │   │   ├── DomainSelectView.cs      ← 화면 2: DB 도메인 선택 (순수 UI, 도메인 목록은 현재 하드코딩)
 │   │   ├── DbKeySelectView.cs       ← 화면 2.5: db_key 복수선택 (본앱 배선 완료, 서버 /mech/dbkeys 기반)
-│   │   ├── ChatView.cs              ← 화면 3: 채팅 (ILlmSession 의존, ⚙→설정 콜백)
+│   │   ├── ChatView.cs              ← 화면 3: 채팅 (IChatSession 의존, ⚙→설정 콜백)
 │   │   ├── SettingsView.cs          ← 설정 화면 (관심분야 재설정 / 외부 AI 재로그인)
 │   │   └── WorkerForm.cs            ← GPT WebView2 워커 (로그인/채팅)
 │   ├── providers/
-│   │   ├── ILlmProvider.cs          ← 인터페이스
-│   │   ├── ILlmSession.cs           ← 채팅이 의존하는 세션 인터페이스 (ChatView ↔ Mock 분리)
+│   │   ├── IChatSession.cs          ← 채팅 세션 인터페이스 (ChatView ↔ Mock 분리)
+│   │   ├── ILlmProvider.cs          ← LLM 프로바이더 인터페이스
+│   │   ├── DbQuerySession.cs        ← DB조회 세션 (IChatSession 구현, Gauss/GPT 분기)
+│   │   ├── NxControlSession.cs      ← NX제어 세션 (IChatSession 구현, 브리지 실행)
+│   │   ├── AutomationSession.cs     ← 자동화 세션 (IChatSession 구현, knox_mail_automation 실행)
 │   │   ├── GaussProvider.cs         ← Gauss (서버 경유)
 │   │   ├── GptProvider.cs           ← GPT (WorkerForm 래핑, userWorker만)
-│   │   └── LlmSession.cs            ← 앱 전역 LLM 선택 관리 (ILlmSession 구현)
+│   │   ├── IToolRouter.cs           ← 도구 라우팅 인터페이스 (2차용)
+│   │   └── ToolCall.cs              ← 도구 호출 정보
 │   ├── mcp/
 │   │   ├── DbMcpClient.cs           ← DB 서버 HTTP 요청 (/mech/ask 등). 응답 images[] base64 파싱
 │   │   ├── DbKeyOption.cs           ← db_key 메타 레코드 (카드/프리뷰 공유, 네트워크 의존 없음)
@@ -100,59 +103,77 @@ NX_ASSISTANT_FINAL/
 │   ├── history/HistoryManager.cs    ← 대화 히스토리
 │   ├── config/DbKeySelectionStore.cs← 도메인별 선택 db_key 로컬 저장 (%LOCALAPPDATA%\NX_Assistant\db_selection.json)
 │   ├── router/RouterClient.cs       ← (1차 배포 미사용, 2차 라우터용 보존)
+│   ├── AppConfig.cs                 ← 앱 전역 설정 (우선순위: appsettings.json > 환경변수 > 기본값)
 │   ├── Program.cs                   ← MainForm 실행 (AppIcon.Load = exe 아이콘 추출)
+│   ├── appsettings.json             ← 기본 설정 (커밋, 안정)
+│   ├── appsettings.local.json       ← 로컬 설정 (gitignore, DbMcpToken/AutomationPython 등)
 │   ├── ui/assets/                   ← 카드 로고 PNG (gauss_logo/chatgpt_logo, EmbeddedResource)
-│   ├── assets/                      ← nx_assistant.ico(작업표시줄/제목줄, <ApplicationIcon>), galaxy_ai_logo.png(NX버튼 소스 참고)
+│   ├── assets/                      ← nx_assistant.ico(작업표시줄/제목줄, <ApplicationIcon>)
 │   └── NxAssistant.csproj
 │
-├── client/nx-customization/        ← NX 시작 시 로드되는 커스터마이제이션 (코덱스 원본)
-│   ├── startup/                    ← .rtb(리본 탭) → .grb(그룹) → .men(버튼) + nx_assistant_galaxy.bmp + README
-│   ├── bitmaps/                    ← ai_sparkle.bmp, nx_assistant_galaxy.bmp
-│   └── application/nx_assistant.men ← 메뉴앱 fallback 정의
+├── client/nx-launcher/             ← NX 버튼 → 앱 실행 런처 (NXOpen DLL)
+│   ├── NxAssistantLauncher.csproj  ← 빌드 정의 (NXOpen 참조: C:\SCAD\NX2406\NXBIN\managed)
+│   ├── launcher.json               ← 설치 시 NxAssistantExe 경로 채워넣기
+│   ├── install.ps1                 ← 빌드 후 DLL을 nx-customization/application/에 복사
+│   └── src/
+│       └── NxAssistantLauncher.cs  ← DLL 진입점 (ApplicationEnter → OpenAssistantFromNx)
 │
-├── client/nx-launcher/             ← NX 버튼 → 앱 실행 런처 소스 (우리 전용, 정식 재설치는 시연 후 TODO)
+├── client/nx-customization/        ← NX 시작 시 로드되는 커스터마이제이션 (설치 원본)
+│   ├── startup/                    ← .rtb(리본 탭) → .grb(그룹) → .men(버튼) + bitmaps
+│   ├── bitmaps/
+│   └── application/nx_assistant.men ← NX_ASSISTANT_OPEN_ACTION 등록 (NxAssistantLauncher.dll이 처리)
+│
+├── client/nx-mcp/                  ← NX 브리지 (repo 내장, 빌드 시 exe 옆으로 복사)
+│   ├── verify_remoting_ready.py    ← NX 제어 명령 실행 스크립트
+│   ├── remoting_bridge/            ← bin/NxMcpSessionServer.dll + NxMcpSessionClient.exe
+│   └── remoting_client_via_mcp.py
+│
+├── client/automation/              ← Knox 자동화 툴 (repo 내장, 빌드 시 exe 옆으로 복사)
+│   ├── knox_mail_automation/       ← quick_delivery_automation.py 등
+│   └── requirements.txt
 │
 ├── client/ui-preview/              ← UI 프리뷰 (개발 전용, 서버/WebView2 없음)
 │   ├── UiPreview.csproj            ← app/ 의 순수 UI 파일을 링크해 컴파일
-│   ├── Program.cs                  ← PreviewShell 실행
-│   ├── PreviewShell.cs             ← MainForm 흐름을 mock 으로 흉내 (전 페이지 연결)
-│   └── MockLlmSession.cs           ← ILlmSession mock (가짜 답변)
+│   ├── Program.cs
+│   ├── PreviewShell.cs             ← MockChatSession 으로 전 페이지 연결
+│   └── MockChatSession.cs          ← IChatSession mock (가짜 답변)
 │
 ├── server/                         ← 서버 PC 전용 (RAG). 이 폴더만 서버 PC로 복사
 │   ├── db-mcp/
-│   │   ├── server.py                ← HTTP 서버 (/health, /mech/domains, /mech/dbkeys, /mech/route, /mech/ask)
-│   │   ├── rag_engine.py            ← RAG 파이프라인 (models = server/models)
-│   │   ├── vector_store.py          ← ChromaDB 로드 (data = server/data)
-│   │   ├── domain_registry.json     ← 도메인 목록 (MECH_STANDARD 등)
-│   │   ├── llm/gauss_llm.py         ← GaussLLM (LangChain)
-│   │   ├── router/                  ← 라우터 LLM (2차용)
-│   │   ├── retrievers/vector_retriever.py
-│   │   └── prompts/                 ← 도메인별 답변 프롬프트 (MECH_STANDARD*.txt 등)
-│   ├── config/
-│   │   ├── settings.example.json    ← 템플릿
-│   │   └── settings.json            ← 실제 키 (직접 생성, gitignore)
+│   │   ├── server.py                ← HTTP 서버 (/health, /mech/domains, /mech/dbkeys, /mech/ask)
+│   │   ├── rag_engine.py
+│   │   ├── vector_store.py
+│   │   ├── domain_registry.json
+│   │   ├── llm/gauss_llm.py
+│   │   └── prompts/
+│   ├── config/settings.json         ← 실제 키 (직접 생성, gitignore)
 │   ├── scripts/
-│   │   ├── start_db_server.ps1      ← 서버 실행
-│   │   ├── smoke_test.py            ← 단독 점검 (health→domains→ask)
-│   │   └── check_retrieval.py       ← 벡터 검색만 점검 (LLM 없이, 도메인별)
-│   ├── data/                        ← 직접 배치 (gitignore)
-│   ├── models/                      ← 직접 배치 (gitignore)
-│   ├── requirements.txt
-│   └── README_SERVER.md             ← 서버 실행/테스트 가이드
+│   └── README_SERVER.md
 │
-├── client/
-│   └── README_CLIENT.md             ← 클라 빌드/실행 가이드
 ├── AGENTS.md                        ← (이 파일) 프로젝트 설명서
+├── CLAUDE.md                        ← Claude Code 전용 설명서 (동일 내용)
 ├── DEV_ENVIRONMENT.md               ← 개발 환경 정리
 └── PROGRESS.md                      ← 진행상황 + 할 일
 ```
 
-※ data/, models/ 는 무거워서 깃헙 미포함. **`server/` 바로 아래**에 배치 (코드가 이 위치 기준).
-※ src/ 폴더(구버전 키워드매칭)는 사용 안 함.
+※ data/, models/ 는 무거워서 깃헙 미포함. **`server/` 바로 아래**에 배치.
 
 ---
 
-## 6. 도메인 키
+## 6. 세션 3형제 (IChatSession 구현체)
+
+| 세션 | 분야 | 동작 |
+|---|---|---|
+| `DbQuerySession` | DB조회 | Gauss: 서버 /mech/ask → 답변. GPT: 서버에서 프롬프트 조립 → GPT 답변 |
+| `NxControlSession` | NX제어 | 자연어→키워드 매핑 → `verify_remoting_ready.py {flag}` 실행 (nx-mcp/ 폴더) |
+| `AutomationSession` | 자동화 | `knox_mail_automation.quick_delivery_automation` 실행 (automation/ 폴더) |
+
+- 전부 `IChatSession` 구현 → `ChatView`가 동일하게 소비
+- `MockChatSession`(ui-preview/)도 동일 인터페이스 → 프리뷰에서 Mock으로 대체
+
+---
+
+## 7. 도메인 키
 
 | 키 | 표시명 | 설명 |
 |---|---|---|
@@ -161,15 +182,9 @@ NX_ASSISTANT_FINAL/
 | CMF_ISSUE | CMF | CMF 문제/이력 |
 | MECHA_DFM | DFM | 공정 설계 표준 (제조 고려) |
 
-※ 서버·클라 모두 MECH_STANDARD 로 통일 완료 (엔드포인트도 /mech/...).
-※ 도메인 하위 DB 선택: `data/{도메인}/db_registry_{도메인}.json` 을 서버가 자동 인식.
-  사용자가 카드에서 복수 선택 → ask 의 db_keys 로 검색 범위 지정. (없으면 전체)
-  MECH_STANDARD db_key: mobile/foldable/water_proof/wearable,
-  MECHA_DFM: cam_design/jig_design/metal_design/mold_design, CMF_*: 단일.
-
 ---
 
-## 7. 환경 제약
+## 8. 환경 제약
 
 | 항목 | VDI | 로컬 PC |
 |---|---|---|
@@ -177,87 +192,100 @@ NX_ASSISTANT_FINAL/
 | Gauss API (sr-cloud.com) | ❌ | ✅ |
 | pip / PyPI | ❌ | ✅ |
 | NuGet | ❌ | ✅ |
-| github push/pull | 불안정 | - |
 | dotnet build | ✅ (메모리 옵션 필수) | ✅ |
-| RAM | 8GB (가용 2.4GB) | - |
+| NX 실행 | ❌ | ✅ |
 
 → DB MCP 서버는 로컬/서버 PC에서만 실행. VDI는 C# 작업 + GPT 테스트.
 
 ---
 
-## 8. 빌드 / 환경변수
+## 9. 빌드 / 설정
 
-### 빌드 (VDI 필수 옵션 - 메모리 제한)
+### 앱 빌드 (VDI 필수 옵션)
 ```
 cd client/app
 dotnet build -p:UseSharedCompilation=false -m:1 --disable-build-servers
 .\bin\Debug\net8.0-windows\NxAssistant.exe
 ```
-OutOfMemory 시: `dotnet build-server shutdown` → `Get-Process dotnet|Stop-Process -Force` → 재시도.
 
-### 환경변수 (VDI, User 영구)
-| 변수 | 용도 |
+### NX 런처 빌드 및 설치
+```
+cd client/nx-launcher
+dotnet build NxAssistantLauncher.csproj -p:UseSharedCompilation=false -m:1 --disable-build-servers
+# 또는 install.ps1 실행 (빌드 + DLL 복사 자동화)
+.\install.ps1
+```
+설치 후 `application/launcher.json`의 `NxAssistantExe` 경로 확인.
+
+### 주요 설정 (appsettings.json + appsettings.local.json)
+| 키 | 기본값 | 설명 |
+|---|---|---|
+| DbMcpUrl | http://127.0.0.1:8766 | DB 서버 주소 |
+| DbMcpToken | "" | DB 서버 인증 토큰 (서버 settings.json과 일치) |
+| NxBridgeDir | "nx-mcp" | NX 브리지 폴더 (상대경로 = exe 옆) |
+| NxBridgePython | "python" | NX 브리지 실행 Python |
+| AutomationDir | "automation" | Knox 자동화 툴 폴더 |
+| AutomationPython | "python" | 자동화 실행 Python (venv 경로 권장) |
+| AutomationCdp | "" | Edge CDP URL (Knox SSO 로그인 브라우저) |
+| Mode | "" | "vdi" 설정 시 서버 체크 예외 |
+
+### 런처 설정 (nx-customization/application/launcher.json)
+| 키 | 설명 |
 |---|---|
-| NX_ASSISTANT_MODE=vdi | 우회 모드 (라우터 건너뜀) |
-| WEBVIEW2_CORE_DLL | WebView2 Core dll 경로 (NuGet 우회) |
-| WEBVIEW2_WINFORMS_DLL | WebView2 WinForms dll 경로 |
-| WEBVIEW2_LOADER_DLL | WebView2 Loader dll 경로 |
-| NX_ASSISTANT_DB_MCP_URL | DB 서버 주소 (기본 http://127.0.0.1:8766) |
-| DB_MCP_TOKEN | DB 서버 인증 토큰 (Bearer). **서버 유효토큰 = settings.json.db_mcp_token 우선**. 불일치 시 401. |
-| NX_ASSISTANT_WEBVIEW2_EXE | **NX 버튼이 띄울 앱 exe 전체경로.** 설치된 코덱스 스파이크 런처가 읽는 변수(≠ `NX_ASSISTANT_EXE`). 데모용 현재 빌드 연결에 사용. |
-| NX_ASSISTANT_FAKE_DBPROMPT=1 | (테스트) 서버 없이 예시 RAG 프롬프트로 GPT 분기 검증. **실서버 테스트 시 끌 것** |
-| NX_ASSISTANT_SHOW_WORKER=1 | (디버그) GPT 워커 창을 띄워 관찰 (평소엔 화면 밖 parking) |
-
-### NX 버튼 → 앱 실행 (현재 = 임시 연결, 시연용)
-- 설치된 런처는 코덱스 **experiments 스파이크 런처**. exe 경로를 `NX_ASSISTANT_WEBVIEW2_EXE`(있으면) → 없으면 하드코딩된 스파이크 publish 경로 순으로 잡음.
-- 그래서 우리 앱 연결 = `setx NX_ASSISTANT_WEBVIEW2_EXE "<...>\bin\Debug\net8.0-windows\NxAssistant.exe"`.
-- **환경변수 상속 주의**: NX는 시작 시점 환경을 상속 → 변수 바꾸면 **로그오프/재로그인**(또는 explorer 재시작) 후 NX 실행해야 반영됨. (DB_MCP_TOKEN도 동일)
-- 정식화(시연 후): `client/nx-launcher` 우리 런처로 빌드·재설치 → NxAssistant.exe 직접 실행, 스파이크 의존 제거.
-
-### 로그 (2종, 위치 다름)
-- **앱 로그**: `%LOCALAPPDATA%\NX_Assistant\logs\nx-assistant.log` (앱 동작/오류)
-- **런처 로그**: `<프로젝트루트>\logs\nx-launcher.log` (NX가 **어떤 exe를 띄웠는지** — `Started WebView2 Assistant: <경로>`)
+| NxAssistantExe | NxAssistant.exe 전체 경로. 비워두면 launcher.json 옆의 NxAssistant.exe |
 
 ---
 
-## 9. UI 설계 원칙 (반복 실패 후 확립)
+## 10. NX 런처 동작 원리
+
+```
+NX HEROS 버튼 클릭
+  → NX가 NxAssistantLauncher.dll의 ApplicationEnter() 호출
+  → ResolveExePath(): 환경변수 NX_ASSISTANT_EXE → launcher.json → DLL 옆 NxAssistant.exe
+  → 이미 열려있으면 창 포커스(BringExistingWindow)
+  → 없으면 Process.Start(NxAssistant.exe)
+```
+
+**설치 위치**: `F:\AX_TF\NX_Assistant\apps\nx-customization\application\`
+- `NxAssistantLauncher.dll` ← 빌드 결과물 복사
+- `launcher.json` ← NxAssistantExe 경로 채워넣기
+- `nx_assistant.men` ← NX_ASSISTANT_OPEN_ACTION 등록 (기존 파일 유지)
+
+---
+
+## 11. UI 설계 원칙
 
 - **텍스트에 고정 Height/Width 금지** (잘림의 근본 원인). AutoSize=true 사용.
-- **고정 높이 카드 안에 Percent 여백 금지** (Percent가 콘텐츠를 0으로 짓눌러 잘림).
-  → 카드도 AutoSize, 또는 콘텐츠를 Dock=Top 스택으로.
-- **동적 Margin 계산 중앙정렬 금지** (타이밍 어긋남). Dock=Fill+TextAlign 또는 Resize 핸들러.
-- **커스텀 OnPaint 컨트롤은 바깥 Margin이 높이를 찌부러뜨릴 수 있음** → 부모 높이 충분히.
-- 영문 디센더(g,s 등)는 고정높이 라벨에서 꼬리 잘림 → AutoSize 필수.
+- **고정 높이 카드 안에 Percent 여백 금지** → 카드도 AutoSize, 또는 콘텐츠를 Dock=Top 스택으로.
+- **동적 Margin 계산 중앙정렬 금지** → Dock=Fill+TextAlign 또는 Resize 핸들러.
 - Light 테마 색: 배경#eef1f5, 표면#ffffff, 테두리#c8d0dc, 강조(남색)#1a3a6b,
   텍스트#1a1f2e, 흐린텍스트#5a6478, GPT그린#10a37f.
 
 ---
 
-## 10. 작업 방식 / 규칙
+## 12. 작업 방식 / 규칙
 
 - 프로젝트에 깃헙 연결됨 → Codex가 project_knowledge_search로 코드 읽기 가능.
-  (단, data/models 등 깃헙 미포함 파일, 미커밋 로컬 변경은 못 봄 → Get-Content로 보여줘야 함)
-- Codex는 수정본을 만들어 파일로 전달 → 사용자가 VDI/로컬에 반영. (직접 파일 수정 불가)
-- 코드 수정 전달: 부분수정은 [파일경로/찾을부분/교체], 경로 항상 명시. 많으면 파일 통째로.
+- Codex는 수정본을 만들어 파일로 전달 → 사용자가 VDI/로컬에 반영.
+- 코드 수정 전달: 부분수정은 [파일경로/찾을부분/교체], 경로 항상 명시.
 - ZIP은 Codex가 직접 못 만듦 → PowerShell 스크립트 제공 → 사용자 실행.
 - GitHub Desktop으로 push (터미널 push는 보안 차단).
-- 독립 테스트 파일로 검증 후 메인 통합.
 
 ---
 
-## 11. 기술 스택
+## 13. 기술 스택
 
 - 클라이언트: C# (WinForms + WebView2, .NET 8)
+- NX 런처: C# (NXOpen DLL, .NET 8, `C:\SCAD\NX2406\NXBIN\managed` 참조)
 - 서버: Python (http.server 기반 DB MCP, 포트 8766)
 - LLM: Gauss(사내 REST API), GPT(WebView2 개인계정)
 - RAG: ChromaDB, Ollama 임베딩(qwen3-embedding:4b), bge-reranker-v2-m3, LangChain
 
 ---
 
-## 12. 배포 단계 / 향후 방향
+## 14. 배포 단계 / 향후 방향
 
 - **1차 배포(20명)**: 라우터 없음. 모드 직접 선택. LLM Gauss/GPT.
-- **2차 배포(1000명)**: 1차 라우터 추가 (RouterClient 로직 보존, 호출만 안 함).
-- **DB 내부 라우터**: DB조회 모드 안 도메인 판단 LLM (도메인 확장 대비).
-- **MCP 전환 계획**: 현재 HTTP REST → 나중에 MCP로. DB MCP/NX MCP 만들 때
-  tool 단위 분리 + 인터페이스 추상화로 교체 쉽게 설계.
+- **2차 배포(1000명)**: 라우터 추가 (RouterClient 로직 보존, 호출만 안 함).
+- **DB 내부 라우터**: DB조회 모드 안 도메인 판단 LLM.
+- **MCP 전환 계획**: 현재 HTTP REST → 나중에 MCP로.

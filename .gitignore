@@ -16,6 +16,8 @@ client/app/obj/
 client/app/publish/
 client/nx-launcher/bin/
 client/nx-launcher/obj/
+client/ui-preview/bin/
+client/ui-preview/obj/
 
 # NX 빌드 산출물
 client/nx-customization/startup/*.dll

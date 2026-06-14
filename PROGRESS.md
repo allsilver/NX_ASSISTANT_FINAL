@@ -1,8 +1,7 @@
 # NX Assistant 개발 진행상황
 
-> 최종 업데이트: 2026-06-11 · **버전: v2.6** (데모 3종 완성 — DB조회 실동작 + NX제어/자동화 스크립트 + 브랜딩)
+> 최종 업데이트: 2026-06-14 · **버전: v3.1** (구파일 정리 + NX 런처 정식화 + AGENTS.md v3 갱신)
 > 진행 상황과 다음 할 일만 기록합니다. 프로젝트 구조·환경·규칙은 CLAUDE.md 참조.
-> **다음: v3** — 실배포 형태로 정리(설정 일원화·리네이밍·런처 정식화). 아래 "v3 정리 계획" 참조.
 
 ---
 
@@ -28,8 +27,8 @@
 - [x] **Phase 3 — 프롬프트 원본 백업** (v3): `.orig` → `server/db-mcp/prompts/_backup/*.original.txt`로 보존(삭제 안 함). 추후 프롬프트 전면 재작성 시 참고.
 - [x] **Phase 2 — 리네이밍(혼동 제거)** (v3): `ILlmSession`→`IChatSession`, `LlmSession`→`DbQuerySession`, `MockLlmSession`→`MockChatSession`. 파일명·타입·참조 전부. 3형제 대칭(DbQuery/NxControl/Automation).
 - [~] **GPT 워커 안정화 (진행중)** (v3): 세션 만료 감지 추가(ProbeAsync가 "세션 만료"/disabled composer 감지) + **전송 직전 재확인**(ChatAsync/ChatStreamAsync가 보내기 전 재probe → 만료면 silently 통과 대신 "재로그인" 안내). ※ 만료 DOM 정규식은 실제 페이지로 튜닝 필요. 자동재시도·멈춤 워치독은 잔여.
-- [ ] **Phase 4 — 토글/플래그 문서화**: 미완성 기능(자동화 fake / NX제어 scripted)은 기능 유지하되 데모↔실제 토글을 설정파일에 명시. 개발 플래그(MODE/SHOW_WORKER/FAKE_DBPROMPT) 분류.
-- [ ] **Phase 5 — NX 런처 정식화(후순위)**: 코덱스 스파이크 런처 의존(`NX_ASSISTANT_WEBVIEW2_EXE`) 제거 → 우리 `client/nx-launcher` 재빌드·재설치. Debug+env 임시연결 → `publish/win-x64` 정식경로.
+- [ ] **Phase 4 — 토글/플래그 문서화**: 개발 플래그(Mode/ShowWorker/FakeDbPrompt) 분류 문서화.
+- [x] **Phase 5 — NX 런처 정식화** (v3.1): 스파이크 런처 의존 제거 → `client/nx-launcher/` csproj 생성, `launcher.json` 기반 경로 설정(환경변수 불필요), `install.ps1` 설치 자동화. NX DLL 경로: `C:\SCAD\NX2406\NXBIN\managed`.
 - [ ] 미완성 기능은 차차 기능별 완성(NX제어 실제 OpenNX API, 자동화 실제 Playwright 등 — LLM이 도구/API 판단).
 
 ### 스트리밍 채팅 UX (V2.4 완료, 2026-06-11)

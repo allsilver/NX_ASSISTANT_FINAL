@@ -1,0 +1,4 @@
+{
+  "_comment": "NxAssistantExe: NxAssistant.exe 전체 경로. 비워두면 이 파일 옆의 NxAssistant.exe를 찾습니다.",
+  "NxAssistantExe": "C:\\Users\\daeun.seo\\Documents\\GitHub\\NX_ASSISTANT_FINAL\\client\\app\\bin\\Debug\\net8.0-windows\\NxAssistant.exe"
+}
