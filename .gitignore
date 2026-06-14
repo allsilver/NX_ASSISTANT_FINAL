@@ -1,12 +1,14 @@
 # 민감 정보
 server/config/settings.json
 .env
+env/
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
 .venv/
+venv/
 
 # C# 빌드
 client/app/bin/
